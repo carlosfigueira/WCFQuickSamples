@@ -1,0 +1,1 @@
+Quick WCF samples used to answer questions from WCF-related forums (MSDN, Silverlight, StackOverflow, etc.)
