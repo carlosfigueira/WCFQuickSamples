@@ -9153,10 +9153,78 @@ namespace QuickCode2
         }
     }
 
+    public class Post_d2f11fd8_3aa5_4713_9ad9_030149cf6af0
+    {
+        [ServiceContract(Name = "ITest")]
+        public interface ITest
+        {
+            [OperationContract]
+            int Add(int x, int y);
+        }
+        [ServiceContract(Name = "ITest")]
+        public interface ITestAsync
+        {
+            [OperationContract(AsyncPattern = true)]
+            IAsyncResult BeginAdd(int x, int y, AsyncCallback callback, object state);
+            int EndAdd(IAsyncResult asyncResult);
+        }
+        public class Service : ITestAsync
+        {
+            public IAsyncResult BeginAdd(int x, int y, AsyncCallback callback, object state)
+            {
+                Func<int, int, int> func = (a, b) => a + b;
+                return func.BeginInvoke(x, y, callback, state);
+            }
+
+            public int EndAdd(IAsyncResult asyncResult)
+            {
+                Func<int, int, int> func = (Func<int, int, int>)((System.Runtime.Remoting.Messaging.AsyncResult)asyncResult).AsyncDelegate;
+                return func.EndInvoke(asyncResult);
+            }
+        }
+        static Binding GetBinding()
+        {
+            var result = new WSHttpBinding(SecurityMode.None);
+            //Change binding settings here
+            return result;
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITestAsync), GetBinding(), "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(GetBinding(), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+            Console.WriteLine("Result (sync): {0}", proxy.Add(5, 8));
+
+            ChannelFactory<ITestAsync> factory2 = new ChannelFactory<ITestAsync>(GetBinding(), new EndpointAddress(baseAddress));
+            ITestAsync proxy2 = factory2.CreateChannel();
+            AutoResetEvent evt = new AutoResetEvent(false);
+            Console.WriteLine(proxy2.BeginAdd(6, 9, delegate(IAsyncResult ar)
+            {
+                Console.WriteLine("Result (async): {0}", proxy2.EndAdd(ar));
+                evt.Set();
+            }, null));
+
+            evt.WaitOne();
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
+            Post_d2f11fd8_3aa5_4713_9ad9_030149cf6af0.Test();
         }
     }
 }
