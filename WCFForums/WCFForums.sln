@@ -1,11 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 11.00
-# Visual Studio 2010
+# Visual C# Express 2010
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuickCode1", "QuickCode1\QuickCode1.csproj", "{2A18E8A1-F918-40CC-BB49-6BBD27455143}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UtilCS", "UtilCS\UtilCS.csproj", "{133C6720-8C9F-4F87-94CE-9785B8FA15F8}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuickCode2", "QuickCode2\QuickCode2.csproj", "{C57FF878-CEF5-43AC-828F-32B5744B414A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuickCode3", "QuickCode3\QuickCode3.csproj", "{250BF407-0114-473D-8226-470D3C2617C3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -47,6 +49,16 @@ Global
 		{C57FF878-CEF5-43AC-828F-32B5744B414A}.Release|Mixed Platforms.Build.0 = Release|x86
 		{C57FF878-CEF5-43AC-828F-32B5744B414A}.Release|x86.ActiveCfg = Release|x86
 		{C57FF878-CEF5-43AC-828F-32B5744B414A}.Release|x86.Build.0 = Release|x86
+		{250BF407-0114-473D-8226-470D3C2617C3}.Debug|Any CPU.ActiveCfg = Debug|x86
+		{250BF407-0114-473D-8226-470D3C2617C3}.Debug|Mixed Platforms.ActiveCfg = Debug|x86
+		{250BF407-0114-473D-8226-470D3C2617C3}.Debug|Mixed Platforms.Build.0 = Debug|x86
+		{250BF407-0114-473D-8226-470D3C2617C3}.Debug|x86.ActiveCfg = Debug|x86
+		{250BF407-0114-473D-8226-470D3C2617C3}.Debug|x86.Build.0 = Debug|x86
+		{250BF407-0114-473D-8226-470D3C2617C3}.Release|Any CPU.ActiveCfg = Release|x86
+		{250BF407-0114-473D-8226-470D3C2617C3}.Release|Mixed Platforms.ActiveCfg = Release|x86
+		{250BF407-0114-473D-8226-470D3C2617C3}.Release|Mixed Platforms.Build.0 = Release|x86
+		{250BF407-0114-473D-8226-470D3C2617C3}.Release|x86.ActiveCfg = Release|x86
+		{250BF407-0114-473D-8226-470D3C2617C3}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
