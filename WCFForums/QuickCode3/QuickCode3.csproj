@@ -44,7 +44,7 @@
     <Reference Include="System.ServiceModel" />
     <Reference Include="System.ServiceModel.Activation" />
     <Reference Include="System.ServiceModel.PollingDuplex">
-      <HintPath>..\..\..\..\Program Files\Microsoft SDKs\Silverlight\v4.0\Libraries\Server\System.ServiceModel.PollingDuplex.dll</HintPath>
+      <HintPath>..\lib\SL4\System.ServiceModel.PollingDuplex.dll</HintPath>
     </Reference>
     <Reference Include="System.ServiceModel.Web" />
     <Reference Include="System.Web" />

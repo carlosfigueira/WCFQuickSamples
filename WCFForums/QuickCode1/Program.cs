@@ -34,6 +34,7 @@ using System.ServiceModel.Discovery;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Runtime.Serialization.Formatters.Soap;
 using System.Web;
+using System.Threading.Tasks;
 
 namespace QuickCode1
 {
@@ -16506,11 +16507,57 @@ namespace QuickCode1
         }
     }
 
+    public class Post_c90b0114_8dac_4996_a24d_aa08122aaf16
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string Echo(string text);
+        }
+        public class Service : ITest
+        {
+            public string Echo(string text)
+            {
+                return text;
+            }
+        }
+        public static void Test(params string[] args)
+        {
+            string baseAddress = "net.pipe://localhost/Service";
+            ServiceHost host = null;
+            bool clientOnly = (args.Length > 0 && args[0].StartsWith("c", StringComparison.OrdinalIgnoreCase));
+            if (!clientOnly)
+            {
+                host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+                host.AddServiceEndpoint(typeof(ITest), new NetNamedPipeBinding(NetNamedPipeSecurityMode.None), "");
+                host.Open();
+                Console.WriteLine("Host opened");
+            }
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(
+                new NetNamedPipeBinding(NetNamedPipeSecurityMode.None),
+                new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+            Console.WriteLine(proxy.Echo("Hello"));
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            if (!clientOnly)
+            {
+                Console.Write("Press ENTER to close the host");
+                Console.ReadLine();
+                host.Close();
+            }
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_7760551.Test();
+            Post_c90b0114_8dac_4996_a24d_aa08122aaf16.Test();
         }
     }
 }
