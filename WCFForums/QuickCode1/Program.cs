@@ -35,6 +35,10 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.Runtime.Serialization.Formatters.Soap;
 using System.Web;
 using System.Threading.Tasks;
+using System.Xml.Schema;
+using System.Diagnostics;
+using System.Text.RegularExpressions;
+using System.Globalization;
 
 namespace QuickCode1
 {
@@ -16553,11 +16557,328 @@ namespace QuickCode1
         }
     }
 
+    // http://stackoverflow.com/q/7836645/751090
+    public class StackOverflow_7836645
+    {
+        [XmlRoot("axf", Namespace = Axf10Namespace)]
+        public class AxfDocument : IXmlSerializable
+        {
+            public const string Axf10Namespace = "http://schemas.something.ru/axf/axf-1.0.0";
+
+            public XmlSchema GetSchema()
+            {
+                return null;
+            }
+
+            public void ReadXml(XmlReader reader)
+            {
+            }
+
+            public void WriteXml(XmlWriter writer)
+            {
+                writer.WriteStartElement("intineraries", Axf10Namespace);
+                writer.WriteElementString("item", Axf10Namespace, "one value");
+                writer.WriteElementString("item", Axf10Namespace, "another value");
+                writer.WriteEndElement();
+            }
+        }
+
+        [MessageContract(IsWrapped = false)]
+        public class OperationResponse
+        {
+            [MessageBodyMember(Name = "axf", Namespace = AxfDocument.Axf10Namespace)]
+            public AxfDocument axf;
+        }
+
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            OperationResponse GetAxf();
+        }
+
+        public class Service : ITest
+        {
+            public OperationResponse GetAxf()
+            {
+                return new OperationResponse { axf = new AxfDocument() };
+            }
+        }
+
+        public static void Test()
+        {
+            Console.WriteLine("Serialization");
+            MemoryStream ms = new MemoryStream();
+            XmlSerializer xs = new XmlSerializer(typeof(AxfDocument));
+            xs.Serialize(ms, new AxfDocument());
+            Console.WriteLine(Encoding.UTF8.GetString(ms.ToArray()));
+
+            Console.WriteLine();
+            Console.WriteLine("Service");
+
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding(), "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(new BasicHttpBinding(), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+            Console.WriteLine(proxy.GetAxf());
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_2e4c484c_eb8e_4b22_94ed_bd551072bf21
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string Echo(string text);
+        }
+        public class Service : ITest
+        {
+            public string Echo(string text)
+            {
+                return text;
+            }
+        }
+        public static void Test()
+        {
+            string baseAddressHttp = "http://" + Environment.MachineName + ":8000/Service";
+            string baseAddressTcp = "net.tcp://" + Environment.MachineName + ":8500/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddressHttp), new Uri(baseAddressTcp));
+            host.AddServiceEndpoint(typeof(ITest), new NetTcpBinding(SecurityMode.None), "");
+            host.Description.Behaviors.Add(new ServiceMetadataBehavior { HttpGetEnabled = true });
+            host.Open();
+            Console.WriteLine("Host opened");
+            Console.WriteLine("Browse to '{0}?wsdl' to see the service metadata", baseAddressHttp);
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_7cb0ff86_5fe1_4266_afac_bcb91eaca5ec
+    {
+        [DataContract()]
+        public partial class TestAttachment
+        {
+            private byte[] fileField;
+            private string filenameField;
+
+            [DataMember()]
+            public byte[] File
+            {
+                get
+                {
+                    return this.fileField;
+                }
+                set
+                {
+                    this.fileField = value;
+                }
+            }
+            [DataMember()]
+            public string Filename
+            {
+                get
+                {
+                    return this.filenameField;
+                }
+                set
+                {
+                    this.filenameField = value;
+                }
+            }
+        }
+        public static void Test()
+        {
+            byte[] simulatedFile = new byte[1000];
+            new Random().NextBytes(simulatedFile);
+            string Filename = "Image.jpg";
+
+            TestAttachment Attachment = new TestAttachment();
+            Attachment.Filename = Filename;
+            Attachment.File = simulatedFile;
+            MemoryStream MTOMInMemory = new MemoryStream();
+            XmlDictionaryWriter TW = XmlDictionaryWriter.CreateMtomWriter(MTOMInMemory, Encoding.UTF8, Int32.MaxValue, "");
+            DataContractSerializer DCS = new DataContractSerializer(Attachment.GetType());
+            DCS.WriteObject(TW, Attachment);
+            TW.Flush();
+            Console.WriteLine(Encoding.UTF8.GetString(MTOMInMemory.ToArray()));
+        }
+    }
+
+    // http://stackoverflow.com/q/7905186/751090
+    public class StackOverflow_7905186
+    {
+        [XmlType(TypeName = "DataMessage", Namespace = "http://tempuri.org/")]
+        public class DataMessage
+        {
+            public string a;
+            public string b;
+            public string c;
+        }
+        [XmlRoot(ElementName = "DataMessages", Namespace = "http://tempuri.org/")]
+        public class DataMessages
+        {
+            [XmlElement(ElementName = "DataMessage")]
+            public List<DataMessage> Messages;
+        }
+        [ServiceContract]
+        public class Service
+        {
+            [XmlSerializerFormat]
+            [OperationContract(Name = "GetData")]
+            [WebGet(ResponseFormat = WebMessageFormat.Xml,
+                    BodyStyle = WebMessageBodyStyle.Bare,
+                    UriTemplate = "Data/{Param}")]
+            [return: MessageParameter(Name = "DataMessages")]
+            public DataMessages GetData(string Param)
+            {
+                return new DataMessages
+                {
+                    Messages = new List<DataMessage>
+                    {
+                        new DataMessage
+                        {
+                            a = "1",
+                            b = "2",
+                            c = "3",
+                        }
+                    }
+                };
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            Console.WriteLine(c.DownloadString(baseAddress + "/Data/foo"));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/7909261/751090
+    public class StackOverflow_7909261
+    {
+        [DataContract]
+        [KnownType(typeof(RegexOptions))]
+        public class InboundMailbox
+        {
+            public const char EmailSeparator = ';';
+
+            [DataMember]
+            public string POP3Host { get; set; }
+
+            [DataMember]
+            public string EmailId { get; set; }
+
+            [DataMember]
+            public string WebServiceURL { get; set; }
+
+            [DataMember]
+            public List<Regex> Allowed { get; set; }
+
+            [DataMember]
+            public List<Regex> Disallowed { get; set; }
+        }
+
+        public static void Test()
+        {
+            MemoryStream ms = new MemoryStream();
+            InboundMailbox obj = new InboundMailbox
+            {
+                POP3Host = "popHost",
+                EmailId = "email",
+                WebServiceURL = "http://web.service",
+                Allowed = new List<Regex>
+                {
+                    new Regex("abcdef", RegexOptions.IgnoreCase),
+                },
+                Disallowed = null,
+            };
+            DataContractSerializer dcs = new DataContractSerializer(typeof(InboundMailbox));
+            try
+            {
+                dcs.WriteObject(ms, obj);
+                Console.WriteLine(Encoding.UTF8.GetString(ms.ToArray()));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+        }
+    }
+
+    // http://stackoverflow.com/q/7919718/751090
+    public class StackOverflow_7919718
+    {
+        [ServiceContract]
+        public class Service
+        {
+            [WebGet(ResponseFormat = WebMessageFormat.Json)]
+            public string GetData()
+            {
+                Console.WriteLine("If-Modified-Since header (1): {0}", WebOperationContext.Current.IncomingRequest.IfModifiedSince);
+                WebOperationContext.Current.IncomingRequest.CheckConditionalRetrieve(DateTime.UtcNow);
+                return "Data";
+            }
+        }
+
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            Console.WriteLine("Not sending If-Modified-Since header (should return 200):");
+            Util.SendRequest(baseAddress + "/GetData", "GET", null, null);
+
+            Console.WriteLine("Sending data in the past, ISO 8601 format (should return 200):");
+            Util.SendRequest(baseAddress + "/GetData", "GET", null, null,
+                new Dictionary<string, string> { { "If-Modified-Since", "2011-10-25T13:09:39.6242263-04:00" } });
+
+            Console.WriteLine("Sending data in the future, ISO 8601 format (should return 304):");
+            Util.SendRequest(baseAddress + "/GetData", "GET", null, null,
+                new Dictionary<string, string> { { "If-Modified-Since", "2021-10-25T13:09:39.6242263-04:00" } });
+
+            Console.WriteLine("Sending data in the past, RFC 1123 format (should return 200):");
+            Util.SendRequest(baseAddress + "/GetData", "GET", null, null,
+                new Dictionary<string, string> { { "If-Modified-Since", "Wed, 26 Oct 2011 01:00:00 GMT" } });
+
+            Console.WriteLine("Sending data in the future, RFC 1123 format (should return 304):");
+            Util.SendRequest(baseAddress + "/GetData", "GET", null, null,
+                new Dictionary<string, string> { { "If-Modified-Since", "Mon, 27 Oct 2031 10:00:00 GMT" } });
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            Post_c90b0114_8dac_4996_a24d_aa08122aaf16.Test();
+            StackOverflow_7919718.Test();
         }
     }
 }

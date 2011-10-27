@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Net;
 using System.IO;
+using System.Reflection;
+using System.Diagnostics;
 
 namespace UtilCS
 {
@@ -23,7 +25,15 @@ namespace UtilCS
             {
                 foreach (string headerName in headers.Keys)
                 {
-                    req.Headers[headerName] = headers[headerName];
+                    switch (headerName)
+                    {
+                        case "If-Modified-Since":
+                            req.IfModifiedSince = DateTime.Parse(headers[headerName]);
+                            break;
+                        default:
+                            req.Headers[headerName] = headers[headerName];
+                            break;
+                    }
                 }
             }
             if (!String.IsNullOrEmpty(contentType))
@@ -118,6 +128,21 @@ namespace UtilCS
             }
 
             Console.WriteLine("   {0}", sb.ToString());
+        }
+        public static MethodBase GetCallingMethod()
+        {
+            StackTrace st = new StackTrace();
+            return st.GetFrame(2).GetMethod();
+        }
+        public static void TraceWithMethod(string text, params object[] args)
+        {
+            if (args != null && args.Length > 0)
+            {
+                text = string.Format(text, args);
+            }
+
+            MethodBase method = GetCallingMethod();
+            Console.WriteLine("[{0}.{1}] {2}", method.DeclaringType.Name, method.Name, text);
         }
     }
 }
