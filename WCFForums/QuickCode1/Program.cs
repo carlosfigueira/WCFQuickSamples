@@ -16874,11 +16874,105 @@ namespace QuickCode1
         }
     }
 
+    public class Post_3bb9b3ad_8fc4_40a6_9bb8_fb34f9011d39
+    {
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(SampleService), new Uri(baseAddress));
+            ServiceMetadataBehavior smb = host.Description.Behaviors.Find<ServiceMetadataBehavior>();
+            if (smb == null)
+            {
+                host.Description.Behaviors.Add(smb = new ServiceMetadataBehavior());
+            }
+
+            smb.HttpGetEnabled = true;
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/7930629/751090
+    public class StackOverflow_7930629
+    {
+        [DataContract]
+        public class Person
+        {
+            public Person() { }
+            public Person(string firstname, string lastname)
+            {
+                this.FirstName = firstname;
+                this.LastName = lastname;
+            }
+
+            [DataMember]
+            public string FirstName { get; set; }
+
+            [DataMember]
+            public string LastName { get; set; }
+        }
+
+        public static string Serialize<T>(T obj)
+        {
+            DataContractJsonSerializer serializer =
+                new DataContractJsonSerializer(typeof(T), typeof(T).Name);
+            MemoryStream ms = new MemoryStream();
+            XmlDictionaryWriter w = JsonReaderWriterFactory.CreateJsonWriter(ms);
+            w.WriteStartElement("root");
+            w.WriteAttributeString("type", "object");
+            serializer.WriteObject(w, obj);
+            w.WriteEndElement();
+            w.Flush();
+            string retVal = Encoding.Default.GetString(ms.ToArray());
+            ms.Dispose();
+            return retVal;
+        }
+        public static void Test()
+        {
+            Console.WriteLine(Serialize(new Person("Jane", "McDoe")));
+        }
+    }
+
+    public class Post_3f28ebac_018a_4b67_becc_5abff4315d3f
+    {
+        public enum CurrencyCode
+        {
+            USD, OTH
+        }
+        [XmlType(TypeName = "Amount", Namespace = "")]
+        public class Amount
+        {
+            [XmlAttribute(AttributeName = "currencyCode")]
+            public CurrencyCode currencyCode;
+            [XmlText]
+            public string Value;
+
+            public override string ToString()
+            {
+                return string.Format("Amount[currencyCode={0},value={1}", currencyCode, Value ?? "<<NULL>>");
+            }
+        }
+        public static void Test()
+        {
+            MemoryStream ms = new MemoryStream();
+            XmlSerializer xs = new XmlSerializer(typeof(Amount));
+            xs.Serialize(ms, new Amount { currencyCode = CurrencyCode.USD, Value = null });
+            Console.WriteLine(Encoding.UTF8.GetString(ms.ToArray()));
+            ms.Position = 0;
+            Amount amt = (Amount)xs.Deserialize(ms);
+            Console.WriteLine(amt);
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_7919718.Test();
+            Post_3f28ebac_018a_4b67_becc_5abff4315d3f.Test();
         }
     }
 }
