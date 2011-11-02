@@ -13783,10 +13783,46 @@ Date: Mon, 23 May 2011 06:56:18 GMT
         }
     }
 
+    // http://stackoverflow.com/q/7974435/751090
+    public class StackOverflow_7974435
+    {
+        [ServiceContract]
+        public class Service
+        {
+            [WebGet(UriTemplate = "/Sum?x={x}&y={y}")]
+            public int Add(int x, int y)
+            {
+                return x + y;
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            WebHttpBinding binding = new WebHttpBinding { CrossDomainScriptAccessEnabled = true };
+            WebHttpBehavior behavior = new WebHttpBehavior { DefaultOutgoingResponseFormat = WebMessageFormat.Json };
+            host.AddServiceEndpoint(typeof(Service), binding, "").Behaviors.Add(behavior);
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            Console.WriteLine("Not a JSONP call");
+            Console.WriteLine(c.DownloadString(baseAddress + "/Sum?x=6&y=8"));
+
+            Console.WriteLine("A JSONP call");
+            Console.WriteLine(c.DownloadString(baseAddress + "/Sum?x=6&y=8&callback=MyFunction"));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
+            StackOverflow_7974435.Test();
         }
     }
 }
