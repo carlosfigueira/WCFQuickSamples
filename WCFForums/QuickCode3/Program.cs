@@ -13794,6 +13794,11 @@ Date: Mon, 23 May 2011 06:56:18 GMT
             {
                 return x + y;
             }
+            [WebGet(UriTemplate = "/Data?isNull={isNull}")]
+            public string GetData(bool isNull)
+            {
+                return isNull ? null : "Hello world";
+            }
         }
         public static void Test()
         {
@@ -13811,6 +13816,12 @@ Date: Mon, 23 May 2011 06:56:18 GMT
 
             Console.WriteLine("A JSONP call");
             Console.WriteLine(c.DownloadString(baseAddress + "/Sum?x=6&y=8&callback=MyFunction"));
+
+            Console.WriteLine("A JSONP call returning string");
+            Console.WriteLine(c.DownloadString(baseAddress + "/Data?isNull=false&callback=MyFunction"));
+
+            Console.WriteLine("A JSONP call returning null");
+            Console.WriteLine(c.DownloadString(baseAddress + "/Data?isNull=true&callback=MyFunction"));
 
             Console.Write("Press ENTER to close the host");
             Console.ReadLine();
