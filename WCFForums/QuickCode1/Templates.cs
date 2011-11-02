@@ -5,6 +5,8 @@ using System.Text;
 using System.Threading;
 using System.ServiceModel;
 using System.ServiceModel.Channels;
+using System.ServiceModel.Web;
+using System.Net;
 
 namespace QuickCode1
 {
@@ -43,6 +45,32 @@ namespace QuickCode1
 
             ((IClientChannel)proxy).Close();
             factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+    public class RestTemplate
+    {
+        [ServiceContract]
+        public class Service
+        {
+            [WebGet]
+            public int Add(int x, int y)
+            {
+                return x + y;
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            Console.WriteLine(c.DownloadString(baseAddress + "/Add?x=6&y=8"));
 
             Console.Write("Press ENTER to close the host");
             Console.ReadLine();
