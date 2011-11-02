@@ -13789,7 +13789,7 @@ Date: Mon, 23 May 2011 06:56:18 GMT
         [ServiceContract]
         public class Service
         {
-            [WebGet]
+            [WebGet(UriTemplate = "/Sum?x={x}&y={y}")]
             public int Add(int x, int y)
             {
                 return x + y;
@@ -13807,10 +13807,10 @@ Date: Mon, 23 May 2011 06:56:18 GMT
 
             WebClient c = new WebClient();
             Console.WriteLine("Not a JSONP call");
-            Console.WriteLine(c.DownloadString(baseAddress + "/Add?x=6&y=8"));
+            Console.WriteLine(c.DownloadString(baseAddress + "/Sum?x=6&y=8"));
 
             Console.WriteLine("A JSONP call");
-            Console.WriteLine(c.DownloadString(baseAddress + "/Add?x=6&y=8&callback=MyFunction"));
+            Console.WriteLine(c.DownloadString(baseAddress + "/Sum?x=6&y=8&callback=MyFunction"));
 
             Console.Write("Press ENTER to close the host");
             Console.ReadLine();
