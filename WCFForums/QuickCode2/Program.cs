@@ -9269,6 +9269,67 @@ namespace QuickCode2
         }
     }
 
+    public class Post_da54a7a9_bc5e_45c4_b1ac_15e1016df4aa
+    {
+        [DataContract]
+        public class Customer
+        {
+            [DataMember]
+            public string Id { get; set; }
+            [DataMember]
+            public string Name { get; set; }
+            [DataMember]
+            public string Address { get; set; }
+        }
+        [ServiceContract]
+        public interface ICustomerManager
+        {
+            [WebGet(UriTemplate = "/Customers")]
+            [OperationContract]
+            List<Customer> GetCustomers();
+
+            [WebGet(UriTemplate = "/Customer/{id}")]
+            Customer GetCustomer(string id);
+        }
+        public class CustomerManagerService : ICustomerManager
+        {
+            List<Customer> AllCustomers = new List<Customer>
+            {
+                new Customer { Id = "1", Name = "Homer", Address = "234 Main St., Springfield" },
+                new Customer { Id = "2", Name = "Marge", Address = "234 Main St., Springfield" },
+                new Customer { Id = "3", Name = "Moe", Address = "100 5th Ave., Springfield" },
+                new Customer { Id = "4", Name = "Flanders", Address = "236 Main St., Springfield" },
+            };
+            public List<Customer> GetCustomers()
+            {
+                return new List<Customer>(AllCustomers);
+            }
+
+            public Customer GetCustomer(string id)
+            {
+                return AllCustomers.Where(c => c.Id == id).FirstOrDefault();
+            }
+        }
+        public class MySoapAndWebFactory : ServiceHostFactory
+        {
+            protected override ServiceHost CreateServiceHost(Type serviceType, Uri[] baseAddresses)
+            {
+                ServiceHost host = new ServiceHost(serviceType, baseAddresses);
+                host.AddServiceEndpoint(typeof(ICustomerManager), new BasicHttpBinding(), "soap");
+                host.AddServiceEndpoint(typeof(ICustomerManager), new WebHttpBinding(), "web").Behaviors.Add(new WebHttpBehavior());
+                ServiceMetadataBehavior smb = host.Description.Behaviors.Find<ServiceMetadataBehavior>();
+                if (smb == null)
+                {
+                    smb = new ServiceMetadataBehavior();
+                    host.Description.Behaviors.Add(smb);
+                }
+
+                smb.HttpGetEnabled = true;
+                return host;
+            }
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
