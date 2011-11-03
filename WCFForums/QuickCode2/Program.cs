@@ -9220,6 +9220,55 @@ namespace QuickCode2
         }
     }
 
+    public class RotTest
+    {
+        private static byte Rotate(byte b, int rotNumber)
+        {
+            int i = b;
+            if (rotNumber < -25 || rotNumber > 25)
+            {
+                throw new ArgumentException("The rotation count must be between -25 and 25");
+            }
+
+            if ('a' <= i && i <= 'z')
+            {
+                i = ((i - 'a' + rotNumber + 26) % 26) + 'a';
+            }
+            else if ('A' <= i && i <= 'Z')
+            {
+                i = ((i - 'A' + rotNumber + 26) % 26) + 'A';
+            }
+
+            return (byte)i;
+        }
+        public static void Test()
+        {
+            string abc = "abcdef ghijkl mnopqr stuvw xyz 012345 6789 ABCDEF GHIJKL MNOPQR STUVW XYZ";
+            for (int i = 0; i < 26; i++)
+            {
+                byte[] abcBytes = Encoding.UTF8.GetBytes(abc);
+                for (int j = 0; j < abcBytes.Length; j++)
+                {
+                    abcBytes[j] = Rotate(abcBytes[j], i);
+                }
+
+                string rotated = Encoding.UTF8.GetString(abcBytes);
+                for (int j = 0; j < abcBytes.Length; j++)
+                {
+                    abcBytes[j] = Rotate(abcBytes[j], -i);
+                }
+
+                string backToNormal = Encoding.UTF8.GetString(abcBytes);
+
+                Console.WriteLine("{0}:", i);
+                Console.WriteLine(abc);
+                Console.WriteLine(rotated);
+                Console.WriteLine("Can unrotate: {0}", abc == backToNormal);
+                Console.WriteLine();
+            }
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
