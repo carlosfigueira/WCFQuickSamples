@@ -16968,11 +16968,153 @@ namespace QuickCode1
         }
     }
 
+    public class TestChangingBinding
+    {
+        class Client : ClientBase<ISampleContract>, ISampleContract
+        {
+            public Client(Binding binding, EndpointAddress endpointAddress)
+                : base(binding, endpointAddress)
+            {
+            }
+
+            public int Add(int x, int y)
+            {
+                return base.Channel.Add(x, y);
+            }
+        }
+        public static void Test()
+        {
+            BasicHttpBinding binding = new BasicHttpBinding();
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(SampleService), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ISampleContract), binding, "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            Client proxy = new Client(binding, new EndpointAddress(baseAddress));
+            Console.WriteLine(proxy.Add(4,5));
+            proxy.Close();
+
+            binding.TextEncoding = Encoding.Unicode;
+            proxy = new Client(binding, new EndpointAddress(baseAddress));
+            Console.WriteLine(proxy.Add(4, 5));
+            proxy.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_300cd5b9_ad18_446f_b1d9_49f124d09128
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string GetData(string data, string address);
+        }
+        public class Service : ITest
+        {
+            public string GetData(string data, string address)
+            {
+                if (address == null)
+                {
+                    return "Data from " + Environment.MachineName + ": " + data;
+                }
+                else
+                {
+                    ChannelFactory<ITest> factory = new ChannelFactory<ITest>(new BasicHttpBinding(), new EndpointAddress(address));
+                    ITest proxy = factory.CreateChannel();
+                    string fromOtherServer = proxy.GetData(data, null);
+                    ((IClientChannel)proxy).Close();
+                    factory.Close();
+                    return "Data via " + Environment.MachineName + ": " + fromOtherServer;
+                }
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress1 = "http://" + Environment.MachineName + ":8000/Service";
+            string baseAddress2 = "http://" + Environment.MachineName + ":8001/Service";
+            ServiceHost host1 = new ServiceHost(typeof(Service), new Uri(baseAddress1));
+            ServiceHost host2 = new ServiceHost(typeof(Service), new Uri(baseAddress2));
+            host1.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding(), "");
+            host2.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding(), "");
+            host1.Open();
+            host2.Open();
+            Console.WriteLine("Hosts opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(new BasicHttpBinding(), new EndpointAddress(baseAddress1));
+            ITest proxy = factory.CreateChannel();
+
+            Console.WriteLine("Call to server without going to the other");
+            Console.WriteLine(proxy.GetData("hello", null));
+            Console.WriteLine();
+
+            Console.WriteLine("Call to server without going to the other server");
+            Console.WriteLine(proxy.GetData("hello", baseAddress2));
+            Console.WriteLine();
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+            host1.Close();
+            host2.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/8010677/751090
+    public class StackOverflow_8010677
+    {
+        [DataContract(Name = "Person", Namespace = "")]
+        public class Person
+        {
+            [DataMember]
+            public string Name;
+            [DataMember(EmitDefaultValue = false)]
+            public int Age;
+
+            private int ageSaved;
+            [OnSerializing]
+            void OnSerializing(StreamingContext context)
+            {
+                this.ageSaved = this.Age;
+                this.Age = default(int); // will not be serialized
+            }
+            [OnSerialized]
+            void OnSerialized(StreamingContext context)
+            {
+                this.Age = this.ageSaved;
+            }
+
+            public override string ToString()
+            {
+                return string.Format("Person[Name={0},Age={1}]", this.Name, this.Age);
+            }
+        }
+
+        public static void Test()
+        {
+            Person p1 = new Person { Name = "Jane Roe", Age = 23 };
+            MemoryStream ms = new MemoryStream();
+            DataContractSerializer dcs = new DataContractSerializer(typeof(Person));
+            Console.WriteLine("Serializing: {0}", p1);
+            dcs.WriteObject(ms, p1);
+            Console.WriteLine("   ==> {0}", Encoding.UTF8.GetString(ms.ToArray()));
+            Console.WriteLine("   ==> After serialization: {0}", p1);
+            Console.WriteLine();
+            Console.WriteLine("Deserializing a XML which contains the Age member");
+            const string XML = "<Person><Age>33</Age><Name>John Doe</Name></Person>";
+            Person p2 = (Person)dcs.ReadObject(new MemoryStream(Encoding.UTF8.GetBytes(XML)));
+            Console.WriteLine("  ==> {0}", p2);
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            Post_3f28ebac_018a_4b67_becc_5abff4315d3f.Test();
+            StackOverflow_8010677.Test();
         }
     }
 }
