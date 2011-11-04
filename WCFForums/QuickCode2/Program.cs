@@ -9330,11 +9330,37 @@ namespace QuickCode2
         }
     }
 
+    // http://stackoverflow.com/q/8012009/751090
+    public class StackOverflow_8012009
+    {
+        const string XML = @"<Person><Enabled>true</Enabled><Name>John Smith</Name></Person>";
+        [DataContract(Namespace = "", Name = "Person")]
+        public class Person
+        {
+            [DataMember]
+            public bool Enabled { get; set; }
+            [DataMember]
+            public string Name { get; set; }
+
+            public override string ToString()
+            {
+                return string.Format("Person[Enabled={0},Name={1}]", this.Enabled, this.Name);
+            }
+        }
+        public static void Test()
+        {
+            DataContractSerializer dcs = new DataContractSerializer(typeof(Person));
+            MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(XML));
+            object obj = dcs.ReadObject(ms);
+            Console.WriteLine(obj);
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            Post_d2f11fd8_3aa5_4713_9ad9_030149cf6af0.Test();
+            StackOverflow_8012009.Test();
         }
     }
 }
