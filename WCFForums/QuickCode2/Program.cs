@@ -9356,11 +9356,224 @@ namespace QuickCode2
         }
     }
 
+    // http://stackoverflow.com/q/8022154/751090
+    public class StackOverflow_8022154
+    {
+        const string XML = @"<places xmlns=""http://where.yahooapis.com/v1/schema.rng""  
+        xmlns:yahoo=""http://www.yahooapis.com/v1/base.rng""  
+        yahoo:start=""0"" yahoo:count=""247"" yahoo:total=""247""> 
+        <place yahoo:uri=""http://where.yahooapis.com/v1/place/23424966""  
+            xml:lang=""en-US""> 
+            <woeid>23424966</woeid> 
+            <placeTypeName code=""12"">Country</placeTypeName> 
+            <name>Sao Tome and Principe</name> 
+        </place> 
+        <place yahoo:uri=""http://where.yahooapis.com/v1/place/23424824""  
+            xml:lang=""en-US""> 
+            <woeid>23424824</woeid> 
+            <placeTypeName code=""12"">Country</placeTypeName> 
+            <name>Ghana</name> 
+        </place> 
+    </places>";
+
+        const string ElementsNamespace = "http://where.yahooapis.com/v1/schema.rng";
+        const string YahooNamespace = "http://www.yahooapis.com/v1/base.rng";
+        const string XmlNamespace = "http://www.w3.org/XML/1998/namespace";
+
+        [XmlType(Namespace = ElementsNamespace, TypeName = "places")]
+        [XmlRoot(ElementName = "places", Namespace = ElementsNamespace)]
+        public class Places
+        {
+            [XmlAttribute(AttributeName = "start", Namespace = YahooNamespace)]
+            public int Start { get; set; }
+            [XmlAttribute(AttributeName = "count", Namespace = YahooNamespace)]
+            public int Count;
+            [XmlAttribute(AttributeName = "total", Namespace = YahooNamespace)]
+            public int Total;
+            [XmlElement(ElementName = "place", Namespace = ElementsNamespace)]
+            public List<Place> AllPlaces { get; set; }
+
+            public override string ToString()
+            {
+                StringBuilder sb = new StringBuilder();
+                sb.AppendFormat("Places[start={0},count={1},total={2}]:", this.Start, this.Count, this.Total);
+                sb.AppendLine();
+                foreach (var place in this.AllPlaces)
+                {
+                    sb.AppendLine("   " + place.ToString());
+                }
+
+                return sb.ToString();
+            }
+        }
+        [XmlType(TypeName = "place", Namespace = ElementsNamespace)]
+        public class Place
+        {
+            [XmlAttribute(AttributeName = "uri", Namespace = YahooNamespace)]
+            public string Uri { get; set; }
+            [XmlAttribute(AttributeName = "lang", Namespace = XmlNamespace)]
+            public string Lang { get; set; }
+            [XmlElement(ElementName = "woeid")]
+            public string Woeid { get; set; }
+            [XmlElement(ElementName = "placeTypeName")]
+            public PlaceTypeName PlaceTypeName;
+            [XmlElement(ElementName = "name")]
+            public string Name { get; set; }
+            
+            public override string ToString()
+            {
+                return string.Format("Place[Uri={0},Lang={1},Woeid={2},PlaceTypeName={3},Name={4}]",
+                    this.Uri, this.Lang, this.Woeid, this.PlaceTypeName, this.Name);
+            }
+        }
+        [XmlType(TypeName = "placeTypeName", Namespace = ElementsNamespace)]
+        public class PlaceTypeName
+        {
+            [XmlAttribute(AttributeName = "code")]
+            public string Code { get; set; }
+            [XmlText]
+            public string Value { get; set; }
+
+            public override string ToString()
+            {
+                return string.Format("TypeName[Code={0},Value={1}]", this.Code, this.Value);
+            }
+        }
+        [ServiceContract]
+        [XmlSerializerFormat]
+        public interface IConsumeGeoPlanet
+        {
+            [OperationContract]
+            [WebGet(
+                UriTemplate = "countries?appid={appId}",
+                ResponseFormat = WebMessageFormat.Xml,
+                BodyStyle = WebMessageBodyStyle.Bare
+            )]
+            Places Countries(string appId);
+        }
+
+        public sealed class GeoPlanetConsumer : ClientBase<IConsumeGeoPlanet>
+        {
+            public GeoPlanetConsumer(string address)
+                : base(new WebHttpBinding(), new EndpointAddress(address))
+            {
+                this.Endpoint.Behaviors.Add(new WebHttpBehavior());
+            }
+
+            public Places Countries(string appId)
+            {
+                return Channel.Countries(appId);
+            }
+        }
+
+        [ServiceContract]
+        public class SimulatedYahooService
+        {
+            [WebGet(UriTemplate = "*")]
+            public Stream GetData()
+            {
+                WebOperationContext.Current.OutgoingResponse.ContentType = "text/xml";
+                return new MemoryStream(Encoding.UTF8.GetBytes(XML));
+            }
+        }
+
+        public static void Test()
+        {
+            Console.WriteLine("First a simpler test with serialization only.");
+            XmlSerializer xs = new XmlSerializer(typeof(Places));
+            MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(XML));
+            object o = xs.Deserialize(ms);
+            Console.WriteLine(o);
+
+            Console.WriteLine();
+            Console.WriteLine("Now in a real service");
+            Console.WriteLine();
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(SimulatedYahooService), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            GeoPlanetConsumer consumer = new GeoPlanetConsumer(baseAddress);
+            Places places = consumer.Countries("abcdef");
+            Console.WriteLine(places);
+        }
+    }
+
+    public class Post_aa392e74_e6ad_481b_93e2_293c3a2b371a
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string Helloworld(string yourname);
+        }
+        public class Service : ITest
+        {
+            public string Helloworld(string yourname)
+            {
+                return "Hello, yourname has " + yourname.Length + " characters";
+            }
+        }
+        class MyInspector : IEndpointBehavior, IDispatchMessageInspector
+        {
+            public void AddBindingParameters(ServiceEndpoint endpoint, BindingParameterCollection bindingParameters)
+            {
+            }
+
+            public void ApplyClientBehavior(ServiceEndpoint endpoint, ClientRuntime clientRuntime)
+            {
+            }
+
+            public void ApplyDispatchBehavior(ServiceEndpoint endpoint, EndpointDispatcher endpointDispatcher)
+            {
+                endpointDispatcher.DispatchRuntime.MessageInspectors.Add(this);
+            }
+
+            public void Validate(ServiceEndpoint endpoint)
+            {
+            }
+
+            public object AfterReceiveRequest(ref Message request, IClientChannel channel, InstanceContext instanceContext)
+            {
+                MessageBuffer buffer = request.CreateBufferedCopy(9999999);
+                Message copied = buffer.CreateMessage();
+                request = copied;
+                return null;
+            }
+
+            public void BeforeSendReply(ref Message reply, object correlationState)
+            {
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            var endpoint = host.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding(), "");
+            endpoint.Behaviors.Add(new MyInspector());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(new BasicHttpBinding(), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+            Console.WriteLine(proxy.Helloworld("John Doe"));
+            string largeName = new string('r', 2000);
+            Console.WriteLine(proxy.Helloworld(largeName));
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_8012009.Test();
+            StackOverflow_8022154.Test();
         }
     }
 }
