@@ -9569,6 +9569,55 @@ namespace QuickCode2
         }
     }
 
+    public class Post_01a72aad_cb4c_41fe_97e0_29f59cdcc1ef
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string Echo(string text);
+        }
+        public class Service : ITest
+        {
+            public string Echo(string text)
+            {
+                return text;
+            }
+        }
+        public class MyOperationSelector : IDispatchOperationSelector
+        {
+            public string SelectOperation(ref Message message)
+            {
+                throw new NotImplementedException();
+            }
+        }
+        static Binding GetBinding()
+        {
+            var result = new WSHttpBinding(SecurityMode.None);
+            //Change binding settings here
+            return result;
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), GetBinding(), "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(GetBinding(), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+            Console.WriteLine(proxy.Echo("Hello"));
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
