@@ -93,6 +93,25 @@ Public Class Post_2cf7cd17_c963_465b_a8ce_3edf5bd0467b
 
 End Class
 
+'http://stackoverflow.com/q/8143837/751090
+Public Class StackOverflow_8143837
+    Public Class Person
+        Private incrementedID As Integer = 0
+        Public ReadOnly Property ID As Integer
+            Get
+                Return Me.incrementedID
+            End Get
+        End Property
+
+        Private Shared nextId As Integer = 0
+
+        Public Sub New()
+            Me.incrementedID = System.Threading.Interlocked.Increment(nextId)
+        End Sub
+
+    End Class
+End Class
+
 Module Module1
 
     Sub Main()

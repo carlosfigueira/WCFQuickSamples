@@ -9618,11 +9618,117 @@ namespace QuickCode2
         }
     }
 
+    public class Post_7eda47aa_ef9b_40e5_a8d4_f1f78e5d00be
+    {
+        public static void Test()
+        {
+            string address = "http://service-name/vdir/PicService.svc/GetPicReport/myImageName";
+            HttpWebRequest req = HttpWebRequest.Create(address) as HttpWebRequest;
+            byte[] myImage = new byte[3000];
+            new Random().NextBytes(myImage); // some image content
+            req.Method = "POST";
+            req.ContentType = "application/octet-stream";
+            Stream reqStream = req.GetRequestStream();
+            reqStream.Write(myImage, 0, myImage.Length);
+            reqStream.Close();
+            HttpWebResponse resp;
+            try
+            {
+                resp = req.GetResponse() as HttpWebResponse;
+            }
+            catch (WebException e)
+            {
+                resp = e.Response as HttpWebResponse;
+            }
+
+            Console.WriteLine("HTTP/{0} {1} {2}", resp.ProtocolVersion, (int)resp.StatusCode, resp.StatusDescription);
+            foreach (var headerName in resp.Headers.AllKeys)
+            {
+                Console.WriteLine("{0}: {1}", headerName, resp.Headers[headerName]);
+            }
+            Console.WriteLine();
+            if (resp.ContentLength > 0)
+            {
+                Console.WriteLine(new StreamReader(resp.GetResponseStream()).ReadToEnd());
+            }
+
+            resp.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/8152252/751090
+    public class StackOverflow_8152252
+    {
+        [DataContract]
+        public class CustomBranches
+        {
+            [DataMember]
+            public int Id { get; set; }
+
+            [DataMember]
+            public string branch_name { get; set; }
+
+            [DataMember]
+            public string address_line_1 { get; set; }
+
+            [DataMember]
+            public string city_name { get; set; }
+
+            public int NonDataMember { get; set; }
+
+            [DataMember]
+            public string FieldDataMember;
+
+            [DataMember]
+            internal string NonPublicMember { get; set; }
+        }
+
+        public static void Test()
+        {
+            BindingFlags instancePublicAndNot = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            var memberNames = typeof(CustomBranches)
+                .GetProperties(instancePublicAndNot)
+                .OfType<MemberInfo>()
+                .Union(typeof(CustomBranches).GetFields(instancePublicAndNot))
+                .Where(x => Attribute.IsDefined(x, typeof(DataMemberAttribute)))
+                .Select(x => x.Name);
+            Console.WriteLine("All data member names");
+            foreach (var memberName in memberNames)
+            {
+                Console.WriteLine("  {0}", memberName);
+            }
+        }
+    }
+
+    public class Post_184d2fb2_2004_4601_aaf2_ea0ff9d55cd4
+    {
+        [DataContract(Name = "Item", Namespace = "")]
+        public class Item
+        {
+            [DataMember]
+            public string Name { get; set; }
+            [DataMember]
+            public object Data { get; set; }
+        }
+        public static void Test()
+        {
+            List<Item> l = new List<Item>
+            {
+                new Item { Name = "Name", Data = "John" },
+                new Item { Name = "Age", Data = 33 },
+            };
+            DataContractSerializer dcs = new DataContractSerializer(l.GetType());
+            MemoryStream ms = new MemoryStream();
+            dcs.WriteObject(ms, l);
+            Console.WriteLine(Encoding.UTF8.GetString(ms.ToArray()));
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_8022154.Test();
+            Post_184d2fb2_2004_4601_aaf2_ea0ff9d55cd4.Test();
         }
     }
 }
