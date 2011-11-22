@@ -16968,11 +16968,97 @@ namespace QuickCode1
         }
     }
 
+    public class Post_f75e08f6_7661_4f08_9b95_13ca44472d5b
+    {
+        [DataContract(Name = "Person", Namespace = "")]
+        public class Person
+        {
+            [DataMember]
+            public string Name { get; set; }
+            [DataMember]
+            public int Age { get; set; }
+        }
+
+        [CollectionDataContract(Name = "MyCollectionOf{0}")]
+        public class MyCollection<T> : List<T>
+        {
+            public MyCollection() : base() { }
+            public MyCollection(IEnumerable<T> collection) : base(collection) { }
+        }
+        
+        [ServiceContract]
+        public interface IPersonService
+        {
+            [OperationContract()]
+            [WebInvoke(UriTemplate = "/person/new", Method = "POST",
+                RequestFormat = WebMessageFormat.Xml,
+                ResponseFormat = WebMessageFormat.Xml)]
+            void AddNewPerson(Person newperson);
+
+            [OperationContract]
+            [WebGet(UriTemplate = "/all/",
+                RequestFormat = WebMessageFormat.Xml,
+                ResponseFormat = WebMessageFormat.Xml)]
+            MyCollection<Person> ListAllPersons();
+        }
+
+        public class PersonService : IPersonService
+        {
+            static List<Person> allPeople = new List<Person>();
+
+            public void AddNewPerson(Person newPerson)
+            {
+                allPeople.Add(newPerson);
+            }
+
+            public MyCollection<Person> ListAllPersons()
+            {
+                return new MyCollection<Person>(allPeople);
+            }
+        }
+
+        static ServiceHost host;
+        static string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+
+        public static void Test()
+        {
+            // For this example only, self-hosting
+            StartService();
+
+            // on an IIS-hosted service, baseAddress is the address to the .svc file
+            string addPersonOperationAddress = baseAddress + "/person/new";
+
+            // We can send either JSON or XML request.
+            Util.SendRequest(addPersonOperationAddress, "POST", "application/json", "{\"Name\":\"John Doe\",\"Age\":33}");
+            Util.SendRequest(addPersonOperationAddress, "POST", "text/xml", "<Person><Age>32</Age><Name>Jane Roe</Name></Person>");
+
+            // Now getting all people
+            string getAllPersonsOperationAddress = baseAddress+ "/all/";
+            Util.SendRequest(getAllPersonsOperationAddress, "GET", null, null);
+
+            Console.WriteLine("Press ENTER to close service");
+            Console.ReadLine();
+            CloseService();
+        }
+
+        private static void CloseService()
+        {
+            host.Close();
+        }
+
+        private static void StartService()
+        {
+            host = new ServiceHost(typeof(PersonService), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(IPersonService), new WebHttpBinding(), "").Behaviors.Add(new WebHttpBehavior());
+            host.Open();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            Post_3f28ebac_018a_4b67_becc_5abff4315d3f.Test();
+            Post_f75e08f6_7661_4f08_9b95_13ca44472d5b.Test();
         }
     }
 }
