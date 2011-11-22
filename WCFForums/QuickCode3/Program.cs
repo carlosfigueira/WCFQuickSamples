@@ -13829,11 +13829,32 @@ Date: Mon, 23 May 2011 06:56:18 GMT
         }
     }
 
+    public static class Post_55b943ea_a99b_46bc_948a_8c06d8b6605f
+    {
+        public static XmlDocument SerializeToXmlDoc<T>(this List<T> list)
+        {
+            DataContractSerializer dcs = new DataContractSerializer(typeof(List<T>));
+            MemoryStream ms = new MemoryStream();
+            dcs.WriteObject(ms, list);
+            ms.Position = 0;
+            XmlDocument doc = new XmlDocument();
+            doc.Load(ms);
+            return doc;
+        }
+        public static void Test()
+        {
+            List<int> l1 = new List<int> { 1, 2, 3, 4 };
+            Console.WriteLine(l1.SerializeToXmlDoc().OuterXml);
+            List<string> l2 = new List<string> { "hello", "world" };
+            Console.WriteLine(l2.SerializeToXmlDoc().OuterXml);
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_7974435.Test();
+            Post_55b943ea_a99b_46bc_948a_8c06d8b6605f.Test();
         }
     }
 }
