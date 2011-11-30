@@ -17196,11 +17196,325 @@ namespace QuickCode1
         }
     }
 
+    public class Post_8c5d8c90_cc99_452a_8276_18b1e978758c
+    {
+        [DataContract(Name = "CaseNote", Namespace = "")]
+        public class CaseNote
+        {
+            [DataMember]
+            //[Column(Name = "NOTE_ID")]
+            public string NoteId { get; set; }
+            [DataMember]
+            //[Column(Name = "CAT_CODE")]
+            public string CategoryCode { get; set; }
+            [DataMember]
+            //[Column(Name = "CLM_ID")]
+            public string ClaimId { get; set; }
+            [DataMember]
+            //[Column(Name = "CUST_CLM_NUM")]
+            public string CustomerClaimNo { get; set; }
+            [DataMember]
+            //[Column(Name = "END_USER")]
+            public string EndUser { get; set; }
+
+            //[DataMember]
+            //[Column(Name = "PERF_DATE")]
+            public DateTime PerformanceDate { get; set; }
+            [DataMember(Name = "PerformanceDate")]
+            private string performanceDateSerialized { get; set; }
+
+            [OnSerializing]
+            void OnSerializing(StreamingContext context)
+            {
+                this.performanceDateSerialized = this.PerformanceDate.ToString("M/d/yyyy h:m:s tt", CultureInfo.InvariantCulture);
+            }
+
+            [OnDeserialized]
+            void OnDeserializing(StreamingContext context)
+            {
+                if (this.performanceDateSerialized == null)
+                {
+                    this.PerformanceDate = default(DateTime);
+                }
+                else
+                {
+                    this.PerformanceDate = DateTime.ParseExact(this.performanceDateSerialized, "M/d/yyyy h:m:s tt", CultureInfo.InvariantCulture);
+                }
+            }
+
+            [DataMember]
+            //[Column(Name = "DATE_ENTERED")]
+            public DateTime EnteredDate { get; set; }
+            [DataMember]
+            //[Column(Name = "NOTE")]
+            public string Note { get; set; }
+            [DataMember]
+            //[Column(Name = "EDIT")]
+            public short CanEdit { get; set; }
+            [DataMember]
+            //[Column(Name = "SVC_CODE")]
+            public string ServiceCode { get; set; }
+            [DataMember]
+            //[Column(Name = "SEQ_NUM")]
+            public int SequenceNumber { get; set; }
+        }
+
+        public static void Test()
+        {
+            CaseNote note = new CaseNote
+            {
+                CanEdit = 0,
+                CategoryCode = "46",
+                ClaimId = "-29371259",
+                CustomerClaimNo = "YKY67415",
+                EndUser = "David Frick",
+                EnteredDate = new DateTime(2011, 9, 29, 12, 52, 46, 933),
+                Note = "BillyM test02 test",
+                NoteId = "-30639706",
+                PerformanceDate = new DateTime(2011, 9, 29, 12, 52, 46, 933),
+                SequenceNumber = -1,
+                ServiceCode = "VER",
+            };
+            DataContractSerializer dcs = new DataContractSerializer(typeof(List<CaseNote>));
+            MemoryStream ms = new MemoryStream();
+            XmlWriterSettings ws = new XmlWriterSettings
+            {
+                Indent = true,
+                OmitXmlDeclaration = true,
+                IndentChars = "  ",
+                Encoding = new UTF8Encoding(false),
+            };
+            XmlWriter w = XmlWriter.Create(ms, ws);
+            dcs.WriteObject(w, new List<CaseNote> { note });
+            w.Flush();
+            Console.WriteLine("Serialized:");
+            Console.WriteLine(Encoding.UTF8.GetString(ms.ToArray()));
+            Console.WriteLine();
+            ms.Position = 0;
+            XmlReader r = XmlReader.Create(ms);
+            List<CaseNote> notes = (List<CaseNote>)dcs.ReadObject(r);
+            Console.WriteLine(notes[0].PerformanceDate);
+        }
+    }
+
+    public class Post_17d5d9c2_adc1_449c_b9b2_34b372c611ee
+    {
+        public static void Test()
+        {
+            //string strResponse = "<soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\">  <soap:Header>    <MessageHeaderInfo xmlns=\"http://testNamespace\">      <TestHeader>        <MessageID>40</MessageID>        <MessageDateTimeStamp>2011-10-26T09:14:07.9679925-07:00</MessageDateTimeStamp>      </TestHeader>    </MessageHeaderInfo>  </soap:Header>  <soap:Body>    <MessageBodyInfo xmlns=\"http://testNamespace\">      <Test>testValue</Test>      <Status>        <StatusCode>SUCCESS</StatusCode>        <StatusMessage>I'm a stub interface</StatusMessage>        <IsSuccess>true</IsSuccess>      </Status>    </MessageBodyInfo>  </soap:Body></soap:Envelope>";
+            string strResponse = @"<soap:Envelope xmlns:soap=""http://www.w3.org/2003/05/soap-envelope"">
+  <soap:Header>
+    <MessageHeader xmlns=""http://testNamespace"">
+      <testHeader>
+        <MessageID>40</MessageID>
+        <MessageDateTimeStamp>2011-10-26T09:14:07.9679925-07:00</MessageDateTimeStamp>
+      </testHeader>
+    </MessageHeader>
+  </soap:Header>
+  <soap:Body>
+    <MessageBodyInfo xmlns=""http://testNamespace"">
+      <Test>testValue</Test>
+      <Status>
+        <StatusCode>SUCCESS</StatusCode>
+        <StatusMessage>I'm a stub interface</StatusMessage>
+        <IsSuccess>true</IsSuccess>
+      </Status>
+    </MessageBodyInfo>
+  </soap:Body>
+</soap:Envelope>";
+
+            XmlDictionaryReader envelopeReader = XmlDictionaryReader.CreateTextReader(new MemoryStream(ASCIIEncoding.Default.GetBytes(strResponse)), new XmlDictionaryReaderQuotas());
+            Message ackMessage = Message.CreateMessage(envelopeReader, strResponse.Length, MessageVersion.Soap12);
+            TypedMessageConverter messageConverter = TypedMessageConverter.Create(typeof(MessageBodyInfo), null, "http://testNamespace");
+            MessageBodyInfo ackObj = (MessageBodyInfo)messageConverter.FromMessage(ackMessage);
+            Console.WriteLine(ackObj.Status);
+            Console.WriteLine(ackObj.MessageHeader);
+
+            MessageBodyInfo other = new MessageBodyInfo
+            {
+                MessageHeader = new MessageHeaderInfo
+                {
+                    testHeader = new TestHeader
+                    {
+                        MessageID = 40,
+                        MessageDateTimeStamp = new DateTime(2011, 10, 26, 9, 14, 7, 967, DateTimeKind.Local)
+                    }
+                },
+                Status = new StatusInfo
+                {
+                    IsSuccess = true,
+                    StatusCode = StatusCodeType.SUCCESS,
+                    StatusMessage = "I'm a stub interface",
+                },
+                Test = "testValue",
+            };
+            Message msg = messageConverter.ToMessage(other, ackMessage.Version);
+            Console.WriteLine(msg);
+        }
+
+        [MessageContract(WrapperNamespace = "http://testNamespace")]
+        public class MessageBodyInfo
+        {
+            [MessageHeader(Namespace = "http://testNamespace")]
+            public MessageHeaderInfo MessageHeader { get; set; }
+            [MessageBodyMember(Namespace = "http://testNamespace", Order = 1)]
+            public string Test { get; set; }
+            [MessageBodyMember(Namespace = "http://testNamespace", Order = 2)]
+            public StatusInfo Status { get; set; }
+        }
+
+        [DataContract(Namespace = "http://testNamespace")]
+        public class MessageHeaderInfo
+        {
+            [DataMember]
+            public TestHeader testHeader { get; set; }
+        }
+        [DataContract(Namespace = "http://testNamespace")]
+        public class TestHeader
+        {
+            [DataMember(Order = 1)]
+            public int MessageID { get; set; }
+            [DataMember(Order = 2)]
+            public DateTime MessageDateTimeStamp { get; set; }
+        }
+        [DataContract(Namespace = "http://testNamespace")]
+        public enum StatusCodeType
+        {
+            [EnumMember]
+            ERROR = 0,
+            [EnumMember]
+            SUCCESS,
+            [EnumMember]
+            WARNING
+        }
+        [DataContract(Namespace = "http://testNamespace")]
+        public class StatusInfo
+        {
+            [DataMember(Order = 1)]
+            public StatusCodeType StatusCode { get; set; }
+            [DataMember(Order = 2)]
+            public string StatusMessage { get; set; }
+            [DataMember(Order = 3)]
+            public bool IsSuccess { get; set; }
+        }
+    }
+
+    public class WebHelpTest
+    {
+        [ServiceContract]
+        [Description("My service")]
+        public class Service
+        {
+            [WebGet]
+            [Description("Adds two numbers and returns the result")]
+            public int Add(int x, int y)
+            {
+                return x + y;
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(Service), new WebHttpBinding(), "").Behaviors.Add(new WebHttpBehavior { HelpEnabled = true });
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            Console.WriteLine(c.DownloadString(baseAddress + "/Add?x=6&y=8"));
+
+            Console.WriteLine(c.DownloadString(baseAddress + "/help"));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/8086483/751090
+    public class StackOverflow_8086483
+    {
+        [DataContract]
+        public class Eval //Models an evaluation
+        {
+            [DataMember]
+            public string Id { get; set; }
+
+            [DataMember]
+            public string Submitter { get; set; }
+
+            [DataMember]
+            public string Comment { get; set; }
+
+            [DataMember(Name = "TimeSubmitted")]
+            private string timeSubmitted;
+
+            public DateTime TimeSubmitted { get; set; }
+
+            public override string ToString()
+            {
+                return string.Format("Eval[Id={0},Submitter={1},Comment={2},TimeSubmitted={3}]", Id, Submitter, Comment, TimeSubmitted);
+            }
+
+            [OnSerializing]
+            void OnSerializing(StreamingContext context)
+            {
+                this.timeSubmitted = this.TimeSubmitted.ToString("MM/dd/yyyy h:mm tt", CultureInfo.InvariantCulture);
+            }
+
+            [OnDeserialized]
+            void OnDeserialized(StreamingContext context)
+            {
+                DateTime value;
+                if (DateTime.TryParseExact(this.timeSubmitted, "MM/dd/yyyy h:mm tt", CultureInfo.InvariantCulture, DateTimeStyles.None, out value))
+                {
+                    this.TimeSubmitted = value;
+                }
+            }
+        }
+
+        [ServiceContract]
+        public interface IEvalService
+        {
+            [OperationContract]
+            [WebInvoke(RequestFormat = WebMessageFormat.Json,
+               ResponseFormat = WebMessageFormat.Json, UriTemplate = "eval",
+               BodyStyle = WebMessageBodyStyle.Wrapped)]
+            void SubmitEval(Eval eval);
+        }
+
+        [ServiceBehavior(InstanceContextMode = InstanceContextMode.Single)]
+        class EvalService : IEvalService
+        {
+            public void SubmitEval(Eval eval)
+            {
+                Console.WriteLine("Received eval: {0}", eval);
+            }
+        }
+
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(EvalService), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            string data = "{\"eval\":{\"Comment\":\"testComment222\",\"Id\":\"doesntMatter\", \"Submitter\":\"Tom\",\"TimeSubmitted\":\"11/10/2011 4:00 PM\"}}";
+            WebClient c = new WebClient();
+            c.Headers[HttpRequestHeader.ContentType] = "application/json; charset=utf-8";
+            c.UploadData(baseAddress + "/eval", Encoding.UTF8.GetBytes(data));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_8010677.Test();
+            StackOverflow_8086483.Test();
         }
     }
 }

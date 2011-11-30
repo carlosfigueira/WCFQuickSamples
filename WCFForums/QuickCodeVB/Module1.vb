@@ -1,19 +1,21 @@
-﻿Imports System.Runtime.Serialization
+﻿Imports System.Net
+Imports System.Runtime.Serialization
 Imports System.ServiceModel
 Imports System.ServiceModel.Channels
 Imports System.ServiceModel.Description
 Imports System.ServiceModel.Dispatcher
 Imports System.ServiceModel.Web
 Imports System.ServiceModel.Activation
-Imports System.Net
 
 Public Class Post_2cf7cd17_c963_465b_a8ce_3edf5bd0467b
     <ServiceContract()> _
     Public Interface ITest
-        <OperationContract()> _
+        <OperationContract(), WebGet()> _
         Function Add(ByVal x As Integer, ByVal y As Integer) As Integer
     End Interface
 
+    <ServiceBehavior(InstanceContextMode:=InstanceContextMode.PerSession, _
+        ConcurrencyMode:=ConcurrencyMode.Multiple)> _
     Public Class Service
         Implements ITest
 
@@ -24,6 +26,7 @@ Public Class Post_2cf7cd17_c963_465b_a8ce_3edf5bd0467b
 
         Public Function Add(ByVal x As Integer, ByVal y As Integer) As Integer Implements ITest.Add
             Me.HostInstance.ServiceCalled(String.Format("Add({0}, {1})", x, y))
+            Threading.Thread.Sleep(1000)
             Return x + y
         End Function
     End Class
@@ -66,26 +69,35 @@ Public Class Post_2cf7cd17_c963_465b_a8ce_3edf5bd0467b
     End Class
 
     Public Sub ServiceCalled(ByVal text As String)
-        Console.WriteLine("[host] Service operation called: {0}", text)
+        Console.WriteLine("[host at thread {0}] Service operation called: {1}", Threading.Thread.CurrentThread.ManagedThreadId, text)
     End Sub
 
     Public Sub HostAndWait()
         Dim baseAddress As String = "http://" + Environment.MachineName + ":8000/Service"
         Dim host As ServiceHost = New ServiceHost(GetType(Service), New Uri(baseAddress))
-        Dim endpoint = host.AddServiceEndpoint(GetType(ITest), New BasicHttpBinding(), "")
+        Dim endpoint = host.AddServiceEndpoint(GetType(ITest), New WebHttpBinding(), "")
+        endpoint.Behaviors.Add(New WebHttpBehavior())
         endpoint.Behaviors.Add(New MyInstanceProvider(Me))
         host.Open()
         Console.WriteLine("Host opened")
 
-        Dim factory = New ChannelFactory(Of ITest)(New BasicHttpBinding(), New EndpointAddress(baseAddress))
-        Dim proxy = factory.CreateChannel()
-        Console.WriteLine(proxy.Add(5, 7))
+        'Dim factory = New ChannelFactory(Of ITest)(New BasicHttpBinding(), New EndpointAddress(baseAddress))
+        'Dim proxy = factory.CreateChannel()
+        'Console.WriteLine(proxy.Add(5, 7))
+
+        For i As Integer = 1 To 10
+            Dim index As Integer = i
+            Threading.ThreadPool.QueueUserWorkItem(Sub()
+                                                       Dim client = New WebClient()
+                                                       Console.WriteLine("Sum: {0}", client.DownloadString(String.Concat(baseAddress, "/Add?x=5&y=", index)))
+                                                   End Sub)
+        Next
 
         Console.WriteLine("Press ENTER to close")
         Console.ReadLine()
 
-        CType(proxy, IClientChannel).Close()
-        factory.Close()
+    'CType(proxy, IClientChannel).Close()
+    'factory.Close()
         host.Close()
     End Sub
 
