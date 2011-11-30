@@ -3,6 +3,9 @@ Imports System.ServiceModel
 Imports System.ServiceModel.Channels
 Imports System.ServiceModel.Description
 Imports System.ServiceModel.Dispatcher
+Imports System.ServiceModel.Web
+Imports System.ServiceModel.Activation
+Imports System.Net
 
 Public Class Post_2cf7cd17_c963_465b_a8ce_3edf5bd0467b
     <ServiceContract()> _
@@ -112,10 +115,144 @@ Public Class StackOverflow_8143837
     End Class
 End Class
 
+Public Class Post_b2c090c1_ecd1_478c_bef3_4eef258e109e
+    <ServiceContract()> _
+    <AspNetCompatibilityRequirements(RequirementsMode:=AspNetCompatibilityRequirementsMode.Required)> _
+    Public Class WcfServices
+        <WebGet(UriTemplate:="/GetHello", ResponseFormat:=WebMessageFormat.Json)> _
+        Public Function GetHello() As String
+            Throw New Exception("wcf error!")
+            Return "Hello World"
+        End Function
+    End Class
+    Public Class WcfErrorHandler
+        Implements IErrorHandler
+        Public Function HandleError(ByVal [error] As Exception) As Boolean Implements IErrorHandler.HandleError
+            'HANDLE ERR HERE
+            Return True
+        End Function
+        Public Sub ProvideFault(ByVal [error] As Exception, ByVal version As MessageVersion, ByRef fault As Message) Implements IErrorHandler.ProvideFault
+        End Sub
+    End Class
+    Public Class ErrorHandlingAddingBehavior
+        Implements IEndpointBehavior
+
+        Public Sub AddBindingParameters(ByVal endpoint As ServiceEndpoint, ByVal bindingParameters As BindingParameterCollection) Implements IEndpointBehavior.AddBindingParameters
+
+        End Sub
+
+        Public Sub ApplyClientBehavior(ByVal endpoint As ServiceEndpoint, ByVal clientRuntime As ClientRuntime) Implements IEndpointBehavior.ApplyClientBehavior
+
+        End Sub
+
+        Public Sub ApplyDispatchBehavior(ByVal endpoint As ServiceEndpoint, ByVal endpointDispatcher As EndpointDispatcher) Implements IEndpointBehavior.ApplyDispatchBehavior
+            endpointDispatcher.ChannelDispatcher.ErrorHandlers.Add(New WcfErrorHandler())
+        End Sub
+
+        Public Sub Validate(ByVal endpoint As ServiceEndpoint) Implements IEndpointBehavior.Validate
+
+        End Sub
+    End Class
+    Public Class FactoryAddingErrorHandler
+        Inherits WebServiceHostFactory
+
+        Protected Overrides Function CreateServiceHost(ByVal serviceType As Type, ByVal baseAddresses() As System.Uri) As ServiceHost
+            Dim host As ServiceHost = MyBase.CreateServiceHost(serviceType, baseAddresses)
+            host.Description.Endpoints(0).Behaviors.Add(New ErrorHandlingAddingBehavior())
+            Return host
+        End Function
+
+    End Class
+End Class
+
+Public Class Post_21712729_972a_43c5_a584_73fd90b869dc
+    <DataContract()> _
+    Public Class FullName
+        <DataMember(Name:="forename")> _
+        Public Property ForeName As String
+        <DataMember(Name:="surname")> _
+        Public Property SurName As String
+    End Class
+    <ServiceContract()> _
+    Public Interface ITest
+        <WebInvoke(Method:="POST", BodyStyle:=WebMessageBodyStyle.Wrapped, ResponseFormat:=WebMessageFormat.Json, RequestFormat:=WebMessageFormat.Json)> _
+        Function writeData(ByVal acode As String, ByVal uid As String, ByVal timestamp As String, ByVal data As FullName, ByVal route As String) As String
+    End Interface
+
+    Public Class Service
+        Implements ITest
+
+        Public Function writeData(ByVal acode As String, ByVal uid As String, ByVal timestamp As String, ByVal data As FullName, ByVal route As String) As String Implements ITest.writeData
+            Console.WriteLine("acode: {0}", acode)
+            Console.WriteLine("uid: {0}", uid)
+            Console.WriteLine("timestamp: {0}", timestamp)
+            Console.WriteLine("route: {0}", route)
+            Console.WriteLine("data.forename: {0}", data.ForeName)
+            Console.WriteLine("data.surname: {0}", data.SurName)
+            Return "ok"
+        End Function
+    End Class
+
+    Public Shared Sub Test()
+        Dim baseAddress As String = "http://" + Environment.MachineName + ":8000/Service"
+        Dim host As WebServiceHost = New WebServiceHost(GetType(Service), New Uri(baseAddress))
+        host.Open()
+        Console.WriteLine("Host opened")
+
+        Dim client As WebClient = New WebClient()
+        client.Headers(HttpRequestHeader.ContentType) = "application/json"
+        Dim request As String = "{""timestamp"":""2011-01-01 00:00:00"",""uid"":""abc123xyz""," + _
+            """acode"":""1"",""data"":{""forename"":""Test"",""surname"":""Test""},""route"":""eqr""}"
+        Console.WriteLine(client.UploadString(baseAddress + "/writeData", request))
+
+        host.Close()
+    End Sub
+End Class
+
+Public Class Post_9d1a0c6e_8e83_420a_8bd3_7a13cc8eadb4
+    <DataContract()> _
+    Public Class TheData
+        <DataMember()> _
+        Property forename As String
+        <DataMember()> _
+        Property surname As String
+        <DataMember(Name:="q-125")> _
+        Property Q125 As String
+    End Class
+
+    <ServiceContract()> _
+    Public Interface ITest
+        <WebInvoke()> _
+        Function Process(ByVal data As TheData) As String
+    End Interface
+
+    Public Class Service
+        Implements ITest
+
+        Public Function Process(ByVal data As TheData) As String Implements ITest.Process
+            Return String.Format("TheData[fore={0},sur={1},q-125={2}]", data.forename, data.surname, data.Q125)
+        End Function
+    End Class
+
+    Public Shared Sub Test()
+        Dim baseAddress As String = "http://" + Environment.MachineName + ":8000/Service"
+        Dim host As WebServiceHost = New WebServiceHost(GetType(Service), New Uri(baseAddress))
+        host.Open()
+        Console.WriteLine("Host opened")
+
+        Dim client As WebClient = New WebClient()
+        client.Headers(HttpRequestHeader.ContentType) = "application/json"
+        Dim json As String = "{""surname"":""Pitt"",""forename"":""Mike"",""q-125"":""No""}"
+        Console.WriteLine(client.UploadString(baseAddress + "/Process", json))
+
+        host.Close()
+    End Sub
+End Class
+
 Module Module1
 
     Sub Main()
-        Post_2cf7cd17_c963_465b_a8ce_3edf5bd0467b.Test()
+        Post_9d1a0c6e_8e83_420a_8bd3_7a13cc8eadb4.Test()
     End Sub
 
 End Module

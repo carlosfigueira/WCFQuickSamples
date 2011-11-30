@@ -29,6 +29,8 @@ using System.Xml.Linq;
 using System.Xml.Serialization;
 using System.Xml.XPath;
 using UtilCS;
+using System.Security.AccessControl;
+using System.Runtime.Serialization.Formatters.Binary;
 
 namespace QuickCode2
 {
@@ -9724,11 +9726,53 @@ namespace QuickCode2
         }
     }
 
+    // http://stackoverflow.com/q/8274306/751090
+    public class StackOverflow_8274306
+    {
+        public static byte[] SerializeFileACL(string path)
+        {
+            var acl = File.GetAccessControl(path, AccessControlSections.All);
+            var serializer = new BinaryFormatter();
+
+            using (var ms = new MemoryStream())
+            {
+                serializer.Serialize(ms, acl);
+                return ms.ToArray();
+            }
+        }
+        public static void Test()
+        {
+            byte[] acl = SerializeFileACL(@"c:\temp\log.txt");
+            Util.PrintBytes(acl);
+        }
+    }
+
+    // http://stackoverflow.com/q/8281703/751090
+    public class StackOverflow_8281703
+    {
+        [XmlType(Namespace = "")]
+        public class Foo
+        {
+            [XmlText]
+            public string Value { set; get; }
+            [XmlAttribute]
+            public string id { set; get; }
+        }
+        public static void Test()
+        {
+            MemoryStream ms = new MemoryStream();
+            XmlSerializer xs = new XmlSerializer(typeof(Foo));
+            Foo foo = new Foo { id = "bar", Value = "some value" };
+            xs.Serialize(ms, foo);
+            Console.WriteLine(Encoding.UTF8.GetString(ms.ToArray()));
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            Post_184d2fb2_2004_4601_aaf2_ea0ff9d55cd4.Test();
+            StackOverflow_8281703.Test();
         }
     }
 }
