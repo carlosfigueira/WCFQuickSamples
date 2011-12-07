@@ -261,10 +261,54 @@ Public Class Post_9d1a0c6e_8e83_420a_8bd3_7a13cc8eadb4
     End Sub
 End Class
 
+Public Class Post_194aced7_905f_495f_bfbc_4cee9f420440
+    <DataContract()> _
+    Public Class CompositeType
+        <DataMember()> _
+        Public Property Name As String
+        <DataMember()> _
+        Public Property Age As Integer
+    End Class
+    <ServiceContract()> _
+    Public Interface ITest
+        <OperationContract()> _
+        Function EchoComposite(ByVal input As CompositeType) As CompositeType
+    End Interface
+
+    Public Class Service
+        Implements ITest
+
+        Public Function EchoComposite(ByVal input As CompositeType) As CompositeType Implements ITest.EchoComposite
+            Console.WriteLine("[service] input = {0}/{1}", input.Name, input.Age)
+            Return input
+        End Function
+    End Class
+
+    Public Shared Sub Test()
+        Dim baseAddress As String = "http://" + Environment.MachineName + ":8000/Service"
+        Dim host As ServiceHost = New ServiceHost(GetType(Service), New Uri(baseAddress))
+        host.AddServiceEndpoint(GetType(ITest), New BasicHttpBinding(), "")
+        host.Open()
+        Console.WriteLine("Host opened")
+
+        Dim factory = New ChannelFactory(Of ITest)(New BasicHttpBinding(), New EndpointAddress(baseAddress))
+        Dim proxy = factory.CreateChannel()
+        Dim input = New CompositeType
+        input.Name = "John Doe"
+        input.Age = 33
+        Dim output = proxy.EchoComposite(input)
+        Console.WriteLine("[client] output={0}/{1}", output.Name, output.Age)
+
+        CType(proxy, IClientChannel).Close()
+        factory.Close()
+        host.Close()
+    End Sub
+End Class
+
 Module Module1
 
     Sub Main()
-        Post_9d1a0c6e_8e83_420a_8bd3_7a13cc8eadb4.Test()
+        Post_194aced7_905f_495f_bfbc_4cee9f420440.Test()
     End Sub
 
 End Module
