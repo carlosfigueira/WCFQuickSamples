@@ -31,6 +31,7 @@ using System.Xml.XPath;
 using UtilCS;
 using System.Security.AccessControl;
 using System.Runtime.Serialization.Formatters.Binary;
+using System.Collections.Specialized;
 
 namespace QuickCode2
 {
@@ -9768,11 +9769,78 @@ namespace QuickCode2
         }
     }
 
+    public class InternalProblem_1
+    {
+        [ServiceContract]
+        public class WebService
+        {
+            [OperationContract]
+            [WebGet(UriTemplate = "*", ResponseFormat = WebMessageFormat.Json)]
+            public Message AllUris(Message message)
+            {
+                WebOperationContext context = WebOperationContext.Current;
+                IncomingWebRequestContext incomingContext = context.IncomingRequest;
+
+                string uri = incomingContext.UriTemplateMatch.RequestUri.ToString();
+                Console.WriteLine("Request to {0}.", uri);
+
+                if (incomingContext.Method != "GET")
+                {
+                    Console.WriteLine(
+                        "Incoming {0} request:\n{1}\n",
+                        incomingContext.Method,
+                        message.GetReaderAtBodyContents().ReadOuterXml());
+                }
+                else
+                {
+                    Console.WriteLine("Incoming GET request.");
+                }
+
+                NameValueCollection query = incomingContext.UriTemplateMatch.QueryParameters;
+                if (query.Count > 0)
+                {
+                    Console.WriteLine("Query parameters:");
+                    foreach (var queryParameterName in query.AllKeys)
+                    {
+                        Console.WriteLine("{0} = \"{1}\"", queryParameterName, query[queryParameterName]);
+                    }
+                }
+
+                Message response = Message.CreateMessage(
+                    MessageVersion.None, 
+                    "*", 
+                    "Response string: JSON format specified", 
+                    new DataContractJsonSerializer(typeof(string)));
+                response.Properties.Add(
+                    WebBodyFormatMessageProperty.Name, 
+                    new WebBodyFormatMessageProperty(WebContentFormat.Json));
+                OutgoingWebResponseContext responseContext = context.OutgoingResponse;
+                responseContext.Headers["X-CustomHeader"] = "Value3";
+                return response;
+            }
+        }
+
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(WebService), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            Console.WriteLine(c.DownloadString(baseAddress + "/Add?x=6&y=8"));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_8281703.Test();
+            InternalProblem_1.Test();
         }
     }
 }
