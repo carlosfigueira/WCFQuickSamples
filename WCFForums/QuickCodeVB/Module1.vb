@@ -1,4 +1,6 @@
-﻿Imports System.Net
+﻿Imports System.Collections.ObjectModel
+Imports System.IO
+Imports System.Net
 Imports System.Runtime.Serialization
 Imports System.ServiceModel
 Imports System.ServiceModel.Channels
@@ -6,6 +8,8 @@ Imports System.ServiceModel.Description
 Imports System.ServiceModel.Dispatcher
 Imports System.ServiceModel.Web
 Imports System.ServiceModel.Activation
+Imports System.Text
+Imports System.Xml
 
 Public Class Post_2cf7cd17_c963_465b_a8ce_3edf5bd0467b
     <ServiceContract()> _
@@ -305,10 +309,63 @@ Public Class Post_194aced7_905f_495f_bfbc_4cee9f420440
     End Sub
 End Class
 
+' http://stackoverflow.com/q/8387789/751090
+Public Class StackOverflow_8387789
+    Public Class A
+        Public Property myStringProp() As String
+        Public Property colB() As Collection(Of B)
+    End Class
+
+    Public Class B
+        Public Property myStringProp() As String
+    End Class
+
+    Public Class Both
+        Public Property col1 As Collection(Of A)
+        Public Property col2 As Collection(Of B)
+    End Class
+
+    Public Shared Sub Test()
+        Dim both = New Both()
+        both.col2 = New Collection(Of B)
+        both.col2.Add(New B With {.myStringProp = "B1"})
+        both.col2.Add(New B With {.myStringProp = "B2"})
+        both.col2.Add(New B With {.myStringProp = "B3"})
+        both.col1 = New Collection(Of A)
+        Dim colBForA1 = New Collection(Of B)
+        colBForA1.Add(both.col2(0))
+        colBForA1.Add(both.col2(1))
+        Dim colBForA2 = New Collection(Of B)
+        colBForA2.Add(both.col2(1))
+        colBForA2.Add(both.col2(2))
+        both.col1.Add(New A With {.myStringProp = "A1", .colB = colBForA1})
+        both.col1.Add(New A With {.myStringProp = "A2", .colB = colBForA2})
+        Dim dcs = New DataContractSerializer(GetType(Both), Nothing, Integer.MaxValue, False, True, Nothing)
+        Dim ms = New MemoryStream()
+        Dim ws = New XmlWriterSettings With { _
+                .Encoding = Encoding.UTF8,
+                .Indent = True,
+                .IndentChars = "  ",
+                .OmitXmlDeclaration = True
+            }
+        Dim xw = XmlWriter.Create(ms, ws)
+        dcs.WriteObject(xw, both)
+        xw.Flush()
+        Console.WriteLine("Serialized: {0}", Text.Encoding.UTF8.GetString(ms.ToArray()))
+
+        ms.Position = 0
+        Console.WriteLine("Now deserializing:")
+        Dim both2 = CType(dcs.ReadObject(ms), Both)
+        Console.WriteLine("Is both.col1(0).colB(0) = both.col2(0)? {0}", both2.col1(0).colB(0) Is both2.col2(0))
+        Console.WriteLine("Is both.col1(1).colB(1) = both.col2(2)? {0}", both2.col1(1).colB(1) Is both2.col2(2))
+        Console.WriteLine("Is both.col1(0).colB(0) = both.col2(2) (should be False)? {0}", both2.col1(0).colB(0) Is both2.col2(2))
+    End Sub
+End Class
+
 Module Module1
 
     Sub Main()
-        Post_194aced7_905f_495f_bfbc_4cee9f420440.Test()
+        StackOverflow_8387789.Test()
     End Sub
 
 End Module
