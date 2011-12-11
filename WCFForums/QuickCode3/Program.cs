@@ -1,44 +1,44 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.ServiceModel;
-using System.ServiceModel.Channels;
-using System.Xml;
-using System.IO;
-using System.Runtime.Serialization;
-using System.Net;
-using System.ServiceModel.Web;
-using System.ServiceModel.Description;
-using System.Xml.Serialization;
-using UtilCS;
-using System.ServiceModel.Dispatcher;
-using System.Collections.Specialized;
-using System.Xml.Linq;
-using System.ServiceModel.Configuration;
-using System.Configuration;
-using System.Reflection;
-using System.Xml.Schema;
-using System.Globalization;
-using System.Threading;
 using System.Collections.ObjectModel;
-using System.ServiceModel.Activation;
-using System.Dynamic;
-using System.Xml.Xsl;
-using System.Net.Mail;
+using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Configuration;
+using System.Diagnostics;
+using System.Dynamic;
+using System.Globalization;
+using System.IO;
+using System.IO.Compression;
+using System.Linq;
+using System.Net;
+using System.Net.Mail;
+using System.Net.Sockets;
+using System.Reflection;
+using System.Reflection.Emit;
+using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
+using System.ServiceModel;
+using System.ServiceModel.Activation;
+using System.ServiceModel.Channels;
+using System.ServiceModel.Configuration;
+using System.ServiceModel.Description;
+using System.ServiceModel.Dispatcher;
+using System.ServiceModel.Syndication;
+using System.ServiceModel.Web;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Web;
+using System.Web.Script.Serialization;
 using System.Windows.Ink;
 using System.Windows.Input;
-using System.Web;
-using System.Diagnostics;
-using System.ServiceModel.Syndication;
-using System.Web.Script.Serialization;
-using System.Threading.Tasks;
-using System.Net.Sockets;
-using System.IO.Compression;
-using System.Reflection.Emit;
-using System.Collections;
+using System.Xml;
+using System.Xml.Linq;
+using System.Xml.Schema;
+using System.Xml.Serialization;
+using System.Xml.Xsl;
+using UtilCS;
 
 namespace QuickCode3
 {
@@ -13850,11 +13850,77 @@ Date: Mon, 23 May 2011 06:56:18 GMT
         }
     }
 
+    public class Post_4e1e619a_bbfd_43c2_86c1_ace3af8c0f91
+    {
+        [KnownType(typeof(Child))]
+        public class Base
+        {
+            public bool IsNew { get; set; }
+        }
+        public class Child : Base
+        {
+            public string Name { get; set; }
+            public override string ToString()
+            {
+                return string.Format("Child[IsNew={0},Name={1}]", IsNew, Name);
+            }
+        }
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            Base[] Echo(Base[] input);
+        }
+        public class Service : ITest
+        {
+            public Base[] Echo(Base[] input)
+            {
+                return input;
+            }
+        }
+        static Binding GetBinding()
+        {
+            var result = new BasicHttpBinding();
+            return result;
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), GetBinding(), "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(GetBinding(), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+
+            Child[] cClass = new Child[] 
+            { 
+                new Child { IsNew = true, Name = "C1" },
+                new Child { IsNew = true, Name = "C2" }
+            };
+            Base[] bClass = cClass;
+            Child[] cClass2 = (Child[])bClass;
+
+            Child[] cClass3 = (Child[])proxy.Echo(cClass);
+
+            Console.WriteLine(cClass3[0]);
+            Console.WriteLine(cClass3[1]);
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            Post_55b943ea_a99b_46bc_948a_8c06d8b6605f.Test();
+            StackOverflow_8458958.Test();
         }
     }
 }
