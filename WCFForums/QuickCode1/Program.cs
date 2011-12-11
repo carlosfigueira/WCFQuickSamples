@@ -17510,11 +17510,286 @@ namespace QuickCode1
         }
     }
 
+    // http://stackoverflow.com/q/8300925/751090
+    public class StackOverflow_8300925
+    {
+        public class Cars : List<Car>
+        {
+        }
+        public class Car
+        {
+            public string Make;
+            public string Model;
+            public int Year;
+        }
+        [ServiceContract]
+        public interface ITest
+        {
+            [WebGet(UriTemplate = "cars")]
+            Cars GetCars();
+        }
+
+        public class Service : ITest
+        {
+            public Cars GetCars()
+            {
+                WebOperationContext ctx = WebOperationContext.Current;
+                string authHeader = ctx.IncomingRequest.Headers[HttpRequestHeader.Authorization];
+                Console.WriteLine("authHeader={0}", authHeader);
+                if (authHeader == null)
+                {
+                    WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.Unauthorized;
+                    return new Cars();
+                }
+
+                return new Cars
+                {
+                    new Car { Make = "Ford", Model = "Focus", Year = 2011 },
+                    new Car { Make = "Toyota", Model = "Corolla", Year = 2009 },
+                };
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebChannelFactory<ITest> factory = new WebChannelFactory<ITest>(new Uri(baseAddress));
+            WebHttpBinding binding = ((WebHttpBinding)factory.Endpoint.Binding);
+            binding.Security.Mode = WebHttpSecurityMode.None;
+            binding.Security.Transport.ClientCredentialType = HttpClientCredentialType.Basic;
+            factory.Credentials.UserName.UserName = "admin";
+            factory.Credentials.UserName.Password = "passw0rd";
+
+            ITest proxy = factory.CreateChannel();
+            Console.WriteLine(proxy.GetCars());
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/8316567/751090
+    public class StackOverflow_8316567
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract(IsOneWay = true)]
+            void Process1();
+            [OperationContract]
+            void Process2();
+            [OperationContract]
+            int Add(int x, int y);
+        }
+        public class Service : ITest
+        {
+            public void Process1() { }
+            public void Process2() { }
+            public int Add(int x, int y) { return x + y; }
+        }
+        static Binding GetBinding()
+        {
+            var result = new BasicHttpBinding();
+            return result;
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), GetBinding(), "");
+            host.Description.Behaviors.Add(new ServiceMetadataBehavior { HttpGetEnabled = true });
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_6ef521c0_1baa_4239_b0e0_a49b722f96f1
+    {
+        [ServiceContract]
+        public interface IProtocol
+        {
+            [WebGet]
+            int Add(int x, int y);
+        }
+        public class Service : IProtocol
+        {
+            public int Add(int x, int y) { return x + y; }
+        }
+        public static void Test()
+        {
+            Uri baseAddress = new Uri("http://" + Environment.MachineName + ":8000/Service");
+            WebServiceHost host = new WebServiceHost(typeof(Service), baseAddress);
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebChannelFactory<IProtocol> cf;
+            IProtocol p;
+
+            Console.WriteLine("Option 1");
+            cf = new WebChannelFactory<IProtocol>(baseAddress);
+            p = cf.CreateChannel();
+            Console.WriteLine(p.Add(5, 7));
+            ((IClientChannel)p).Close();
+            cf.Close();
+            Console.WriteLine();
+
+            Console.WriteLine("Option 2 - BUG");
+            cf = new WebChannelFactory<IProtocol>(new WebHttpBinding());
+            // cf.Endpoint.Behaviors.Add(new WebHttpBehavior()); bug happens both with and without the behavior
+            try
+            {
+                p = null;
+                p = cf.CreateChannel(new EndpointAddress(baseAddress));
+                Console.WriteLine(p.Add(5, 8));
+                ((IClientChannel)p).Close();
+                cf.Close();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Error: {0}", e);
+                if (p != null)
+                {
+                    ((IClientChannel)p).Abort();
+                }
+
+                cf.Abort();
+            }
+            Console.WriteLine();
+
+            Console.WriteLine("Option 2 - Workaround");
+            ChannelFactory<IProtocol> factory = new ChannelFactory<IProtocol>(new WebHttpBinding());
+            factory.Endpoint.Behaviors.Add(new WebHttpBehavior());
+            try
+            {
+                p = null;
+                p = factory.CreateChannel(new EndpointAddress(baseAddress));
+                Console.WriteLine(p.Add(5, 8));
+                ((IClientChannel)p).Close();
+                cf.Close();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Error: {0}", e);
+                if (p != null)
+                {
+                    ((IClientChannel)p).Abort();
+                }
+
+                cf.Abort();
+            }
+            Console.WriteLine();
+
+            Console.WriteLine("Option 3");
+            cf = new WebChannelFactory<IProtocol>(new WebHttpBinding(), baseAddress);
+            p = cf.CreateChannel();
+            Console.WriteLine(p.Add(5, 9));
+            ((IClientChannel)p).Close();
+            cf.Close();
+            Console.WriteLine();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_1cee0dbb_bb8f_485f_b735_c52b44c9b878
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string Echo(string text);
+        }
+        public class Service : ITest
+        {
+            public string Echo(string text)
+            {
+                RemoteEndpointMessageProperty remoteEndpointProp;
+                remoteEndpointProp = (RemoteEndpointMessageProperty)OperationContext.Current.IncomingMessageProperties[RemoteEndpointMessageProperty.Name];
+                Console.WriteLine("Request from {0}:{1}", remoteEndpointProp.Address, remoteEndpointProp.Port);
+                return text;
+            }
+        }
+        static Binding GetBinding()
+        {
+            var result = new WSHttpBinding(SecurityMode.None);
+            //Change binding settings here
+            return result;
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), GetBinding(), "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(GetBinding(), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+            Console.WriteLine(proxy.Echo("Hello using machine address"));
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            string localhostAddress = baseAddress.Replace(Environment.MachineName, "localhost");
+            factory = new ChannelFactory<ITest>(GetBinding(), new EndpointAddress(localhostAddress));
+            proxy = factory.CreateChannel();
+            Console.WriteLine(proxy.Echo("Hello using localhost address"));
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/8409092/751090
+    public class StackOverflow_8409092
+    {
+        static Task<string> AsyncMethod()
+        {
+            return Task.Factory.StartNew<string>(() =>
+            {
+                Thread.Sleep(1000);
+                return "Hello world";
+            });
+        }
+
+        static Task<string> AnotherAsyncMethod()
+        {
+            TaskCompletionSource<string> tcs = new TaskCompletionSource<string>();
+            AsyncMethod().ContinueWith(task =>
+            {
+                tcs.SetResult(task.Result);
+            });
+
+            return tcs.Task;
+        }
+
+        public static void Test()
+        {
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
+            string str = AnotherAsyncMethod().Result;
+            sw.Stop();
+            Console.WriteLine("Result: {0} (in {1} milliseconds)", str, sw.ElapsedMilliseconds);
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_8086483.Test();
+            StackOverflow_8409092.Test();
         }
     }
 }

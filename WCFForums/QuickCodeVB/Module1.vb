@@ -1,4 +1,6 @@
-﻿Imports System.Net
+﻿Imports System.Collections.ObjectModel
+Imports System.IO
+Imports System.Net
 Imports System.Runtime.Serialization
 Imports System.ServiceModel
 Imports System.ServiceModel.Channels
@@ -6,6 +8,8 @@ Imports System.ServiceModel.Description
 Imports System.ServiceModel.Dispatcher
 Imports System.ServiceModel.Web
 Imports System.ServiceModel.Activation
+Imports System.Text
+Imports System.Xml
 
 Public Class Post_2cf7cd17_c963_465b_a8ce_3edf5bd0467b
     <ServiceContract()> _
@@ -261,10 +265,107 @@ Public Class Post_9d1a0c6e_8e83_420a_8bd3_7a13cc8eadb4
     End Sub
 End Class
 
+Public Class Post_194aced7_905f_495f_bfbc_4cee9f420440
+    <DataContract()> _
+    Public Class CompositeType
+        <DataMember()> _
+        Public Property Name As String
+        <DataMember()> _
+        Public Property Age As Integer
+    End Class
+    <ServiceContract()> _
+    Public Interface ITest
+        <OperationContract()> _
+        Function EchoComposite(ByVal input As CompositeType) As CompositeType
+    End Interface
+
+    Public Class Service
+        Implements ITest
+
+        Public Function EchoComposite(ByVal input As CompositeType) As CompositeType Implements ITest.EchoComposite
+            Console.WriteLine("[service] input = {0}/{1}", input.Name, input.Age)
+            Return input
+        End Function
+    End Class
+
+    Public Shared Sub Test()
+        Dim baseAddress As String = "http://" + Environment.MachineName + ":8000/Service"
+        Dim host As ServiceHost = New ServiceHost(GetType(Service), New Uri(baseAddress))
+        host.AddServiceEndpoint(GetType(ITest), New BasicHttpBinding(), "")
+        host.Open()
+        Console.WriteLine("Host opened")
+
+        Dim factory = New ChannelFactory(Of ITest)(New BasicHttpBinding(), New EndpointAddress(baseAddress))
+        Dim proxy = factory.CreateChannel()
+        Dim input = New CompositeType
+        input.Name = "John Doe"
+        input.Age = 33
+        Dim output = proxy.EchoComposite(input)
+        Console.WriteLine("[client] output={0}/{1}", output.Name, output.Age)
+
+        CType(proxy, IClientChannel).Close()
+        factory.Close()
+        host.Close()
+    End Sub
+End Class
+
+' http://stackoverflow.com/q/8387789/751090
+Public Class StackOverflow_8387789
+    Public Class A
+        Public Property myStringProp() As String
+        Public Property colB() As Collection(Of B)
+    End Class
+
+    Public Class B
+        Public Property myStringProp() As String
+    End Class
+
+    Public Class Both
+        Public Property col1 As Collection(Of A)
+        Public Property col2 As Collection(Of B)
+    End Class
+
+    Public Shared Sub Test()
+        Dim both = New Both()
+        both.col2 = New Collection(Of B)
+        both.col2.Add(New B With {.myStringProp = "B1"})
+        both.col2.Add(New B With {.myStringProp = "B2"})
+        both.col2.Add(New B With {.myStringProp = "B3"})
+        both.col1 = New Collection(Of A)
+        Dim colBForA1 = New Collection(Of B)
+        colBForA1.Add(both.col2(0))
+        colBForA1.Add(both.col2(1))
+        Dim colBForA2 = New Collection(Of B)
+        colBForA2.Add(both.col2(1))
+        colBForA2.Add(both.col2(2))
+        both.col1.Add(New A With {.myStringProp = "A1", .colB = colBForA1})
+        both.col1.Add(New A With {.myStringProp = "A2", .colB = colBForA2})
+        Dim dcs = New DataContractSerializer(GetType(Both), Nothing, Integer.MaxValue, False, True, Nothing)
+        Dim ms = New MemoryStream()
+        Dim ws = New XmlWriterSettings With { _
+                .Encoding = Encoding.UTF8,
+                .Indent = True,
+                .IndentChars = "  ",
+                .OmitXmlDeclaration = True
+            }
+        Dim xw = XmlWriter.Create(ms, ws)
+        dcs.WriteObject(xw, both)
+        xw.Flush()
+        Console.WriteLine("Serialized: {0}", Text.Encoding.UTF8.GetString(ms.ToArray()))
+
+        ms.Position = 0
+        Console.WriteLine("Now deserializing:")
+        Dim both2 = CType(dcs.ReadObject(ms), Both)
+        Console.WriteLine("Is both.col1(0).colB(0) = both.col2(0)? {0}", both2.col1(0).colB(0) Is both2.col2(0))
+        Console.WriteLine("Is both.col1(1).colB(1) = both.col2(2)? {0}", both2.col1(1).colB(1) Is both2.col2(2))
+        Console.WriteLine("Is both.col1(0).colB(0) = both.col2(2) (should be False)? {0}", both2.col1(0).colB(0) Is both2.col2(2))
+    End Sub
+End Class
+
 Module Module1
 
     Sub Main()
-        Post_9d1a0c6e_8e83_420a_8bd3_7a13cc8eadb4.Test()
+        StackOverflow_8387789.Test()
     End Sub
 
 End Module
