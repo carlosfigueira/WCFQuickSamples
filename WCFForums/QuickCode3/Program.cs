@@ -13916,11 +13916,49 @@ Date: Mon, 23 May 2011 06:56:18 GMT
         }
     }
 
+    // http://stackoverflow.com/q/8472985/751090
+    public class StackOverflow_8472985
+    {
+        [ServiceContract]
+        public class Service
+        {
+            [WebGet]
+            public int DiffDates(DateTime startDate, DateTime endDate)
+            {
+                Console.WriteLine("[service] startDate: {0}", startDate);
+                Console.WriteLine("[service] endDate: {0}", endDate);
+                return (int)endDate.Subtract(startDate).TotalDays;
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            DateTime startDate = new DateTime(2011, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            DateTime endDate = new DateTime(2011, 12, 12, 0, 0, 0, DateTimeKind.Utc);
+
+            string uri = string.Format(baseAddress + "/DiffDates?startdate={0}&endDate={1}",
+                startDate.ToString("yyyy-MM-dd"),
+                endDate.ToString("yyyy-MM-dd"));
+
+            Console.WriteLine("URI: {0}", uri);
+            Console.WriteLine(c.DownloadString(uri));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_8458958.Test();
+            StackOverflow_8472985.Test();
         }
     }
 }
