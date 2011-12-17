@@ -362,10 +362,70 @@ Public Class StackOverflow_8387789
     End Sub
 End Class
 
+Public Class Post_7ba47b64_696b_48dc_9688_5a679d62e643
+    Public Class SampleOptions
+        Public Property id As Integer
+        Public Property title As String
+    End Class
+    Public Class Sample
+        Public Property status As String
+        Public Property userId As Integer
+        Public Property name As String
+        Public Property rol As Integer
+        Public Property options As List(Of SampleOptions)
+    End Class
+    <ServiceContract()> _
+    <AspNetCompatibilityRequirements(RequirementsMode:=AspNetCompatibilityRequirementsMode.Allowed)> _
+    <ServiceBehavior(InstanceContextMode:=InstanceContextMode.PerCall)> _
+    Public Class MobileRestServices
+        <WebGet(UriTemplate:="Option1", _
+            ResponseFormat:=WebMessageFormat.Json, _
+            BodyStyle:=WebMessageBodyStyle.Bare)>
+        Public Function ManageMobileUsers1() As Stream
+            Dim Sample As String = "{""status"":""ok"",""userId"":23847,""name"":""Marco Casario"",""rol"":0,""options"":[{""id"":1,""title"":""Ventas""},{""id"":2,""title"":""Compras""},{""id"":3,""title"":""Recursos Humanos""}]}"
+            WebOperationContext.Current.OutgoingResponse.ContentType = "application/json; charset=utf-8"
+            Return New MemoryStream(Encoding.UTF8.GetBytes(Sample))
+        End Function
+        <WebGet(UriTemplate:="Option2", _
+            ResponseFormat:=WebMessageFormat.Json, _
+            BodyStyle:=WebMessageBodyStyle.Bare)>
+        Public Function ManageMobileUsers2() As Sample
+            Dim sample As New Sample
+            sample.name = "Marco Casario"
+            sample.rol = 0
+            sample.status = "ok"
+            sample.userId = 23847
+            sample.options = New List(Of SampleOptions)
+            sample.options.Add(New SampleOptions With {.id = 1, .title = "Ventas"})
+            sample.options.Add(New SampleOptions With {.id = 2, .title = "Compras"})
+            sample.options.Add(New SampleOptions With {.id = 3, .title = "Recursos Humanos"})
+            Return sample   ' A simply string JSON.
+        End Function
+    End Class
+
+    Public Shared Sub Test()
+        Dim baseAddress As String = "http://" + Environment.MachineName + ":8000/Service"
+        Dim host As ServiceHost = New ServiceHost(GetType(MobileRestServices), New Uri(baseAddress))
+        Dim behavior = New WebHttpBehavior()
+        host.AddServiceEndpoint(GetType(MobileRestServices), New WebHttpBinding(), "").Behaviors.Add(behavior)
+        host.Open()
+        Console.WriteLine("Host opened")
+
+        Dim wc As WebClient = New WebClient()
+        Dim datos As String = wc.DownloadString(baseAddress + "/Option1")
+        Console.WriteLine(datos)
+
+        datos = wc.DownloadString(baseAddress + "/Option2")
+        Console.WriteLine(datos)
+
+        host.Close()
+    End Sub
+End Class
+
 Module Module1
 
     Sub Main()
-        StackOverflow_8387789.Test()
+        Post_7ba47b64_696b_48dc_9688_5a679d62e643.Test()
     End Sub
 
 End Module
