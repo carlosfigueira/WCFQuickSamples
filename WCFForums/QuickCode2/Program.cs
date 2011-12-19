@@ -2,23 +2,33 @@
 using System.CodeDom;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Configuration;
 using System.Data;
 using System.Diagnostics;
 using System.Drawing;
+using System.IdentityModel.Claims;
+using System.IdentityModel.Policy;
+using System.IdentityModel.Selectors;
+using System.IdentityModel.Tokens;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Runtime.Serialization;
+using System.Runtime.Serialization.Formatters.Binary;
 using System.Runtime.Serialization.Json;
+using System.Security.AccessControl;
+using System.Security.Permissions;
+using System.Security.Principal;
 using System.ServiceModel;
 using System.ServiceModel.Activation;
 using System.ServiceModel.Channels;
 using System.ServiceModel.Configuration;
 using System.ServiceModel.Description;
 using System.ServiceModel.Dispatcher;
+using System.ServiceModel.Security;
 using System.ServiceModel.Syndication;
 using System.ServiceModel.Web;
 using System.Text;
@@ -29,9 +39,6 @@ using System.Xml.Linq;
 using System.Xml.Serialization;
 using System.Xml.XPath;
 using UtilCS;
-using System.Security.AccessControl;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.Collections.Specialized;
 
 namespace QuickCode2
 {
@@ -9836,11 +9843,120 @@ namespace QuickCode2
         }
     }
 
+    class TransportCredentialOnlyTest
+    {
+        [ServiceContract]
+        interface ISecureService
+        {
+            [OperationContract]
+            string Method1(string request);
+        }
+
+        [ServiceBehavior]
+        class SecureService : ISecureService
+        {
+            [PrincipalPermission(SecurityAction.Demand, Role = "everyone")]
+            public string Method1(string request)
+            {
+                return String.Format("Hello, \"{0}\"", Thread.CurrentPrincipal.Identity.Name);
+            }
+        }
+        static Binding GetBinding()
+        {
+            BasicHttpBinding result = new BasicHttpBinding();
+            result.Security.Mode = BasicHttpSecurityMode.TransportCredentialOnly;
+            result.Security.Transport.ClientCredentialType = HttpClientCredentialType.Basic;
+            return result;
+        }
+        class CustomAuthorizationPolicy : IAuthorizationPolicy
+        {
+            string id = Guid.NewGuid().ToString();
+
+            public string Id
+            {
+                get { return this.id; }
+            }
+
+            public ClaimSet Issuer
+            {
+                get { return ClaimSet.System; }
+            }
+
+            public bool Evaluate(EvaluationContext context, ref object state)
+            {
+                object obj;
+                if (!context.Properties.TryGetValue("Identities", out obj))
+                    return false;
+
+                IList<IIdentity> identities = obj as IList<IIdentity>;
+                if (obj == null || identities.Count <= 0)
+                    return false;
+
+                context.Properties["Principal"] = new CustomPrincipal(identities[0]);
+                return true;
+            }
+        }
+
+        class CustomPrincipal : IPrincipal
+        {
+            IIdentity identity;
+            public CustomPrincipal(IIdentity identity)
+            {
+                this.identity = identity;
+            }
+
+            public IIdentity Identity
+            {
+                get { return this.identity; }
+            }
+
+            public bool IsInRole(string role)
+            {
+                return true;
+            }
+        }
+        class MyPasswordValidator : UserNamePasswordValidator
+        {
+            public override void Validate(string userName, string password)
+            {
+                if (userName != password)
+                {
+                    throw new SecurityTokenException("Unauthorized");
+                }
+            }
+        }
+        public static void Test()
+        {
+            Uri serviceUri = new Uri("http://" + Environment.MachineName + ":8000/Service");
+            ServiceHost host = new ServiceHost(typeof(SecureService));
+            host.AddServiceEndpoint(typeof(ISecureService), GetBinding(), serviceUri);
+            List<IAuthorizationPolicy> policies = new List<IAuthorizationPolicy>();
+            policies.Add(new CustomAuthorizationPolicy());
+            host.Authorization.ExternalAuthorizationPolicies = policies.AsReadOnly();
+            host.Authorization.PrincipalPermissionMode = PrincipalPermissionMode.Custom;
+
+            host.Credentials.UserNameAuthentication.UserNamePasswordValidationMode = UserNamePasswordValidationMode.Custom;
+            host.Credentials.UserNameAuthentication.CustomUserNamePasswordValidator = new MyPasswordValidator();
+            
+            host.Open();
+
+            EndpointAddress sr = new EndpointAddress(serviceUri);
+            ChannelFactory<ISecureService> cf = new ChannelFactory<ISecureService>(GetBinding(), sr);
+            cf.Credentials.UserName.UserName = "John Doe";
+            cf.Credentials.UserName.Password = "John Doe";
+            ISecureService client = cf.CreateChannel();
+            Console.WriteLine("Client received response from Method1: {0}", client.Method1("hello"));
+            ((IChannel)client).Close();
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            InternalProblem_1.Test();
+            TransportCredentialOnlyTest.Test();
         }
     }
 }
