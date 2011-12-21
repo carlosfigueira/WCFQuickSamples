@@ -1,0 +1,1 @@
+﻿<%@ ServiceHost Language="C#" Debug="true" Service="StackOverflow_8537634.EduLink" CodeBehind="StackOverflow_8537634.svc.cs" %>
