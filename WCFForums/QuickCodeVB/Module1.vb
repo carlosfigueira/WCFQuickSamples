@@ -422,10 +422,85 @@ Public Class Post_7ba47b64_696b_48dc_9688_5a679d62e643
     End Sub
 End Class
 
+Public Class Post_5098d8ba_e6d1_4c63_8b72_7147c591b6d1
+    <DataContract()> _
+    Public Class AreaOptions
+
+        <DataMember(name:="id", Order:=5)> _
+        Public Property id As Integer
+
+        <DataMember(name:="title", Order:=6)> _
+        Public Property title As String
+
+    End Class
+
+    <DataContract()> _
+    Public Class Logins
+
+        <DataMember(name:="status", Order:=0)> _
+        Public Property status As String
+
+        <DataMember(name:="userId", Order:=1)> _
+        Public Property userId As Integer
+
+        <DataMember(name:="name", Order:=2)> _
+        Public Property name As String
+
+        <DataMember(name:="rol", Order:=3)> _
+        Public Property rol As Integer
+
+        <DataMember(name:="areas", Order:=4)> _
+        Public Property areas As List(Of AreaOptions)
+
+    End Class
+
+    <ServiceContract()>
+    <AspNetCompatibilityRequirements(RequirementsMode:=AspNetCompatibilityRequirementsMode.Allowed)>
+    <ServiceBehavior(InstanceContextMode:=InstanceContextMode.PerCall)>
+    Public Class MobileRestServices
+        <WebGet(UriTemplate:="ManageMobileUsers/{UsrNmb}/{UsrPwd}/{Device}",
+            ResponseFormat:=WebMessageFormat.Json,
+            BodyStyle:=WebMessageBodyStyle.Bare)>
+        Public Function ManageMobileUsers(ByVal UsrNmb As String, ByVal UsrPwd As String, ByVal Device As String) As Logins
+            Dim Login As New Logins
+            Login.name = "Usuario Demo"
+            Login.rol = 0
+            Login.status = "ok"
+            Login.userId = 12345
+            Login.areas = New List(Of AreaOptions)
+            Login.areas.Add(New AreaOptions With {.id = 1, .title = "COSTOS_Y_GASTOS"})
+            Login.areas.Add(New AreaOptions With {.id = 2, .title = "VENTAS_BULK"})
+            Login.areas.Add(New AreaOptions With {.id = 3, .title = "VENTAS_CR"})
+            Login.areas.Add(New AreaOptions With {.id = 4, .title = "CARTERA_ANEJAMIENTOS"})
+            Login.areas.Add(New AreaOptions With {.id = 5, .title = "BULK"})
+            Login.areas.Add(New AreaOptions With {.id = 6, .title = "VENTAS_GASES_ENVASADOS"})
+            Login.areas.Add(New AreaOptions With {.id = 7, .title = "COSTOS_Y_GASTOS_CR"})
+            Login.areas.Add(New AreaOptions With {.id = 8, .title = "CILINDROS"})
+            Login.areas.Add(New AreaOptions With {.id = 9, .title = "VENTAS_INTEGRADAS_GENVASADOS"})
+            Login.areas.Add(New AreaOptions With {.id = 10, .title = "COSTOS_Y_GASTOS_JDE_90"})
+
+            Return Login   ' A simply string JSON.
+        End Function
+    End Class
+
+    Public Shared Sub Test()
+        Dim baseAddress As String = "http://" + Environment.MachineName + ":8000/Service"
+        Dim host As WebServiceHost = New WebServiceHost(GetType(MobileRestServices), New Uri(baseAddress))
+        host.Open()
+        Console.WriteLine("Host opened")
+
+        Dim client As WebClient = New WebClient()
+        Console.WriteLine(client.DownloadString(baseAddress + "/ManageMobileUsers/john/foo/dev"))
+
+        host.Close()
+    End Sub
+
+End Class
+
 Module Module1
 
     Sub Main()
-        Post_7ba47b64_696b_48dc_9688_5a679d62e643.Test()
+        Post_5098d8ba_e6d1_4c63_8b72_7147c591b6d1.Test()
     End Sub
 
 End Module
