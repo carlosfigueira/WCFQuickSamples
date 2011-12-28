@@ -17785,11 +17785,201 @@ namespace QuickCode1
         }
     }
 
+    public class Post_c3bcce8f_c035_4f69_ba60_a56f27f82540
+    {
+        [ServiceContract]
+        public class Service
+        {
+            [OperationContract]
+            [WebInvoke(UriTemplate = "/ByteArray/{ID}", Method = "PUT")]
+            public string CreateFile1(string ID, byte[] data)
+            {
+                return Encoding.UTF8.GetString(data);
+            }
+
+            [OperationContract]
+            [WebInvoke(UriTemplate = "/Stream/{ID}", Method = "PUT")]
+            public string CreateFile2(string ID, Stream data)
+            {
+                return new StreamReader(data).ReadToEnd();
+            }
+        }
+        public static string SendRequest(string uri, string method, string contentType, byte[] bodyBytes)
+        {
+            string responseBody = null;
+
+            HttpWebRequest req = (HttpWebRequest)HttpWebRequest.Create(uri);
+            req.Method = method;
+            if (!String.IsNullOrEmpty(contentType))
+            {
+                req.ContentType = contentType;
+            }
+
+            if (bodyBytes != null)
+            {
+                req.GetRequestStream().Write(bodyBytes, 0, bodyBytes.Length);
+                req.GetRequestStream().Close();
+            }
+
+            HttpWebResponse resp;
+            try
+            {
+                resp = (HttpWebResponse)req.GetResponse();
+            }
+            catch (WebException e)
+            {
+                resp = (HttpWebResponse)e.Response;
+            }
+
+            if (resp == null)
+            {
+                responseBody = null;
+                Console.WriteLine("Response is null");
+            }
+            else
+            {
+                Console.WriteLine("HTTP/{0} {1} {2}", resp.ProtocolVersion, (int)resp.StatusCode, resp.StatusDescription);
+                foreach (string headerName in resp.Headers.AllKeys)
+                {
+                    Console.WriteLine("{0}: {1}", headerName, resp.Headers[headerName]);
+                }
+                Console.WriteLine();
+                Stream respStream = resp.GetResponseStream();
+                if (respStream != null)
+                {
+                    responseBody = new StreamReader(respStream).ReadToEnd();
+                    Console.WriteLine(responseBody);
+                }
+                else
+                {
+                    Console.WriteLine("HttpWebResponse.GetResponseStream returned null");
+                }
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*  ");
+            Console.WriteLine();
+
+            return responseBody;
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            string inputString = "Hello world, these are the file contents";
+            byte[] inputBytes = Encoding.UTF8.GetBytes(inputString);
+
+            string base64BinaryInput = "<base64Binary xmlns=\"http://schemas.microsoft.com/2003/10/Serialization/\">" +
+                Convert.ToBase64String(inputBytes, Base64FormattingOptions.None) +
+                "</base64Binary>";
+
+            SendRequest(baseAddress + "/ByteArray/123", "PUT", "text/xml", Encoding.UTF8.GetBytes(base64BinaryInput));
+            SendRequest(baseAddress + "/Stream/123", "PUT", "application/octet-stream", inputBytes);
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_409e2909_4ba0_436c_aa28_7099d6ccbd0d
+    {
+        public enum ObjectChangeType { Added, Deleted, Modified, None }
+
+        [DataContract]
+        public abstract class ObjectBase : INotifyPropertyChanged
+        {
+            private ObjectChangeType _ObjectState;
+
+            private bool isDeserializing;
+
+            [DataMember]
+            public ObjectChangeType ObjectState
+            {
+                get { return _ObjectState; }
+                set
+                {
+                    _ObjectState = value;
+                }
+            }
+
+            [OnDeserializing]
+            void OnDeserializing(StreamingContext context)
+            {
+                this.isDeserializing = true;
+            }
+
+            [OnDeserialized]
+            void OnDeserialized(StreamingContext context)
+            {
+                this.isDeserializing = false;
+            }
+
+            public event PropertyChangedEventHandler PropertyChanged;
+
+            protected void NotifyPropertyChanged(String info)
+            {
+                if (!this.isDeserializing)
+                {
+                    if (ObjectState != ObjectChangeType.Added && ObjectState != ObjectChangeType.Deleted)
+                    {
+                        ObjectState = ObjectChangeType.Modified;
+                    }
+
+                    if (PropertyChanged != null)
+                    {
+                        PropertyChanged(this, new PropertyChangedEventArgs(info));
+                    }
+                }
+            }
+
+            public ObjectBase()
+            {
+                ObjectState = ObjectChangeType.Added;
+            }
+        }
+
+        [DataContract]
+        public class ObjectDerived : ObjectBase
+        {
+            private string _Value;
+
+            [DataMember]
+            public string Value
+            {
+                get { return _Value; }
+                set
+                {
+                    if (value != _Value)
+                    {
+                        _Value = value;
+                        NotifyPropertyChanged("Value");
+                    }
+                }
+            }
+        }
+
+        public static void Test()
+        {
+            MemoryStream ms = new MemoryStream();
+            ObjectDerived od = new ObjectDerived { Value = "Hello", ObjectState = ObjectChangeType.None };
+            DataContractSerializer dcs = new DataContractSerializer(typeof(ObjectDerived));
+            dcs.WriteObject(ms, od);
+            Console.WriteLine("Serialized: {0}", Encoding.UTF8.GetString(ms.ToArray()));
+            ms.Position = 0;
+            ObjectDerived od2 = (ObjectDerived)dcs.ReadObject(ms);
+            Console.WriteLine("State: {0}", od2.ObjectState);
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_8409092.Test();
+            Post_409e2909_4ba0_436c_aa28_7099d6ccbd0d.Test();
         }
     }
 }

@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UsingDynamicProxy", "UsingD
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DynamicProxy", "DynamicProxy\DynamicProxy.csproj", "{353E88D3-690E-40F5-B670-D38CD046E786}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuickWebCode1", "QuickWebCode1\QuickWebCode1.csproj", "{3AF2AD80-3CB4-4BEE-BFF7-C559C8600767}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -95,6 +97,16 @@ Global
 		{353E88D3-690E-40F5-B670-D38CD046E786}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{353E88D3-690E-40F5-B670-D38CD046E786}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{353E88D3-690E-40F5-B670-D38CD046E786}.Release|x86.ActiveCfg = Release|Any CPU
+		{3AF2AD80-3CB4-4BEE-BFF7-C559C8600767}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3AF2AD80-3CB4-4BEE-BFF7-C559C8600767}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3AF2AD80-3CB4-4BEE-BFF7-C559C8600767}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{3AF2AD80-3CB4-4BEE-BFF7-C559C8600767}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{3AF2AD80-3CB4-4BEE-BFF7-C559C8600767}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3AF2AD80-3CB4-4BEE-BFF7-C559C8600767}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3AF2AD80-3CB4-4BEE-BFF7-C559C8600767}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3AF2AD80-3CB4-4BEE-BFF7-C559C8600767}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{3AF2AD80-3CB4-4BEE-BFF7-C559C8600767}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{3AF2AD80-3CB4-4BEE-BFF7-C559C8600767}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

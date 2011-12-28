@@ -1,0 +1,30 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Quick template</title>
+    <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-1.7.1.js"></script>
+</head>
+<body>
+    <script type="text/javascript">
+        function StackOverflow_8537634_Test() {
+            var url = "/StackOverflow_8537634.svc/SaveUserData";
+            $.ajax({
+                type: "POST",
+                contentType: "application/json; charset=utf-8",
+                url: url,
+                data: '{"userInfo":{"EmailID":"praveen", "LevelID": 1}}',
+                dataType: "json",
+                processData: false,
+                success: function (data, textStatus, jqXHR) {
+                    $("#result").text(data);
+                },
+                error: function (jqXHR, textStatus, errorThrown) {
+                    $("#result").text("error");
+                }
+            });
+        }
+    </script>
+    <input type="button" value="Click Me" onclick="StackOverflow_8537634_Test();" />
+    <div id='result'></div>
+</body>
+</html>
