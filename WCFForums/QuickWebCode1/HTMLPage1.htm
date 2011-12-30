@@ -23,8 +23,37 @@
                 }
             });
         }
+
+        function Post_ca5941b4_bfcf_4546_a418_cc91a321c2fb() {
+            var url = "/Post_ca5941b4_bfcf_4546_a418_cc91a321c2fb.svc";
+            var request = "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\">" +
+                    "<s:Body>" +
+                        "<Add xmlns=\"http://tempuri.org/\">" +
+                            "<x>5</x><y>7</y>" +
+                        "</Add>" +
+                    "</s:Body>" +
+                "</s:Envelope>";
+            $.ajax({
+                type: "POST",
+                url: url,
+                data: request,
+                contentType: "text/xml",
+                beforeSend: function (xhr) {
+                    xhr.setRequestHeader(
+                        "SOAPAction",
+                        "http://tempuri.org/IService1/Add");
+                },
+                success: function (data, textStatus, jqXHR) {
+                    $("#result").text(jqXHR.responseText);
+                },
+                error: function (jqXHR, textStatus, errorThrown) {
+                    $("#result").text("error");
+                }
+            });
+        }
     </script>
-    <input type="button" value="Click Me" onclick="StackOverflow_8537634_Test();" />
+    <input type="button" value="StackOverflow 8537634" onclick="StackOverflow_8537634_Test();" /> <br />
+    <input type="button" value="MSDN ca5941b4-bfcf-4546-a418-cc91a321c2fb" onclick="Post_ca5941b4_bfcf_4546_a418_cc91a321c2fb();" />
     <div id='result'></div>
 </body>
 </html>
