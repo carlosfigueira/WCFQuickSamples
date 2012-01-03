@@ -17975,11 +17975,574 @@ namespace QuickCode1
         }
     }
 
+    // http://stackoverflow.com/q/8670954/751090
+    public class StackOverflow_8670954
+    {
+        [DataContract(Name = "Person", Namespace = "MyNamespace")]
+        public class Person
+        {
+            [DataMember]
+            public string Name { get; set; }
+            [DataMember]
+            public int Age { get; set; }
+
+            public override string ToString()
+            {
+                return string.Format("Person[Name={0},Age={1}]", Name, Age);
+            }
+        }
+        [DataContract(Name = "Employee", Namespace = "MyNamespace")]
+        public class Employee : Person
+        {
+            [DataMember]
+            public int EmployeeId { get; set; }
+
+            public override string ToString()
+            {
+                return string.Format("Employee[Id={0},Name={1}]", EmployeeId, Name);
+            }
+        }
+        [ServiceContract]
+        public interface ITest
+        {
+            [WebInvoke(RequestFormat = WebMessageFormat.Json, ResponseFormat = WebMessageFormat.Json)]
+            [ServiceKnownType(typeof(Employee))]
+            string PrintPerson(Person person);
+        }
+        public class Service : ITest
+        {
+            public string PrintPerson(Person person)
+            {
+                return person.ToString();
+            }
+        }
+        static Binding GetBinding()
+        {
+            var result = new CustomBinding(new WebHttpBinding());
+            for (int i = 0; i < result.Elements.Count; i++)
+            {
+                MessageEncodingBindingElement mebe = result.Elements[i] as MessageEncodingBindingElement;
+                if (mebe != null)
+                {
+                    result.Elements[i] = new MyEncodingBindingElement(mebe);
+                    break;
+                }
+            }
+            return result;
+        }
+        class MyEncodingBindingElement : MessageEncodingBindingElement
+        {
+            MessageEncodingBindingElement inner;
+            public MyEncodingBindingElement(MessageEncodingBindingElement inner)
+            {
+                this.inner = inner;
+            }
+
+            public override MessageEncoderFactory CreateMessageEncoderFactory()
+            {
+                return new MyEncoderFactory(this.inner.CreateMessageEncoderFactory());
+            }
+
+            public override MessageVersion MessageVersion
+            {
+                get { return this.inner.MessageVersion; }
+                set { this.inner.MessageVersion = value; }
+            }
+
+            public override BindingElement Clone()
+            {
+                return new MyEncodingBindingElement(this.inner);
+            }
+
+            public override bool CanBuildChannelListener<TChannel>(BindingContext context)
+            {
+                return context.CanBuildInnerChannelListener<TChannel>();
+            }
+
+            public override IChannelListener<TChannel> BuildChannelListener<TChannel>(BindingContext context)
+            {
+                context.BindingParameters.Add(this);
+                return context.BuildInnerChannelListener<TChannel>();
+            }
+
+            class MyEncoderFactory : MessageEncoderFactory
+            {
+                private MessageEncoderFactory inner;
+
+                public MyEncoderFactory(MessageEncoderFactory inner)
+                {
+                    this.inner = inner;
+                }
+
+                public override MessageEncoder Encoder
+                {
+                    get { return new MyEncoder(this.inner.Encoder); }
+                }
+
+                public override MessageVersion MessageVersion
+                {
+                    get { return this.inner.MessageVersion; }
+                }
+            }
+
+            class MyEncoder : MessageEncoder
+            {
+                private MessageEncoder inner;
+
+                public MyEncoder(MessageEncoder inner)
+                {
+                    this.inner = inner;
+                }
+
+                public override string ContentType
+                {
+                    get { throw new NotImplementedException(); }
+                }
+
+                public override string MediaType
+                {
+                    get { throw new NotImplementedException(); }
+                }
+
+                public override MessageVersion MessageVersion
+                {
+                    get { throw new NotImplementedException(); }
+                }
+
+                public override bool IsContentTypeSupported(string contentType)
+                {
+                    return this.inner.IsContentTypeSupported(contentType);
+                }
+
+                public override Message ReadMessage(ArraySegment<byte> buffer, BufferManager bufferManager, string contentType)
+                {
+                    if (IsJsonContentType(contentType))
+                    {
+                        // the encoder can also support other types of content (raw, xml), so we don't want to deal with those
+
+                        MemoryStream writeStream = new MemoryStream();
+                        XmlDictionaryWriter jsonWriter = JsonReaderWriterFactory.CreateJsonWriter(writeStream, Encoding.UTF8, false);
+                        XmlDictionaryReader jsonReader = JsonReaderWriterFactory.CreateJsonReader(buffer.Array, buffer.Offset, buffer.Count, XmlDictionaryReaderQuotas.Max);
+                        jsonWriter.WriteNode(jsonReader, true);
+                        jsonWriter.Flush();
+
+                        byte[] newBuffer = bufferManager.TakeBuffer(buffer.Offset + (int)writeStream.Position);
+                        Array.Copy(writeStream.GetBuffer(), 0, newBuffer, buffer.Offset, (int)writeStream.Position);
+                        bufferManager.ReturnBuffer(buffer.Array);
+                        buffer = new ArraySegment<byte>(newBuffer, buffer.Offset, (int)writeStream.Position);
+                        writeStream.Dispose();
+                        jsonReader.Close();
+                        jsonWriter.Close();
+
+                        //    if (buffer.Array != null && buffer.Count > 10)
+                        //    {
+                        //        // It only makes sense to "fix" the input for those which have the __type specifier
+
+                        //        byte[] array = buffer.Array;
+                        //        int index = buffer.Offset;
+                        //        SkipWhitespace(buffer, ref index);
+                        //        if (array[index] == '{')
+                        //        {
+                        //            int openCurlyBracePosition = index;
+                        //            index++;
+                        //            int afterOpenCurlyBrace = index;
+                        //            SkipWhitespace(buffer, ref index);
+                        //            if (index != afterOpenCurlyBrace)
+                        //            {
+                        //                // ok, we need to fix up the input. Let's take a new buffer (can be
+                        //                // the same size as the original one, since we'll reduce it)
+                        //                byte[] newBuffer = bufferManager.TakeBuffer(buffer.Offset + buffer.Count);
+
+                        //                // Copy the bytes up to the '{'
+                        //                Array.Copy(buffer.Array, 0, newBuffer, 0, afterOpenCurlyBrace);
+
+                        //                // Now copy the rest of the buffer
+                        //                Array.Copy(buffer.Array, index, newBuffer, afterOpenCurlyBrace, buffer.Offset + buffer.Count - index);
+
+                        //                // We can now return the original buffer
+                        //                bufferManager.ReturnBuffer(buffer.Array);
+
+                        //                // And recreate the buffer
+                        //                buffer = new ArraySegment<byte>(newBuffer, buffer.Offset, buffer.Count - (index - openCurlyBracePosition - 1));
+                        //            }
+                        //        }
+                        //    }
+                    }
+
+                    return this.inner.ReadMessage(buffer, bufferManager, contentType);
+                }
+
+                static bool IsJsonContentType(string contentType)
+                {
+                    return contentType.StartsWith("application/json", StringComparison.OrdinalIgnoreCase) ||
+                        contentType.StartsWith("text/json", StringComparison.OrdinalIgnoreCase);
+                }
+
+                public override Message ReadMessage(Stream stream, int maxSizeOfHeaders, string contentType)
+                {
+                    throw new NotSupportedException("Streamed transfer not supported");
+                }
+
+                public override ArraySegment<byte> WriteMessage(Message message, int maxMessageSize, BufferManager bufferManager, int messageOffset)
+                {
+                    return this.inner.WriteMessage(message, maxMessageSize, bufferManager, messageOffset);
+                }
+
+                public override void WriteMessage(Message message, Stream stream)
+                {
+                    throw new NotSupportedException("Streamed transfer not supported");
+                }
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), GetBinding(), "").Behaviors.Add(new WebHttpBehavior());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            string[] inputs = new string[]
+            {
+                "{\"__type\":\"Employee:MyNamespace\",\"Age\":33,\"Name\":\"John\",\"EmployeeId\":123}",
+                "{  \"__type\":\"Employee:MyNamespace\",\"Age\":33,\"Name\":\"John\",\"EmployeeId\":123}",
+            };
+
+            foreach (string input in inputs)
+            {
+                WebClient c = new WebClient();
+                c.Headers[HttpRequestHeader.ContentType] = "application/json";
+                Console.WriteLine(c.UploadString(baseAddress + "/PrintPerson", input));
+            }
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/8661714/751090
+    public class StackOverflow_8661714
+    {
+        [DataContract(Name = "SuperClass", Namespace = "WhitespaceTest")]
+        [KnownType(typeof(SubClass))]
+        public class SuperClass
+        {
+            [DataMember]
+            public string Message { get; set; }
+        }
+
+        [DataContract(Name = "SubClass", Namespace = "WhitespaceTest")]
+        public class SubClass : SuperClass
+        {
+            [DataMember]
+            public string Extra { get; set; }
+        }
+        public static void Test()
+        {
+            string originalJson = "{    \"__type\":\"SubClass:WhitespaceTest\",    \"Message\":\"Message\",    \"Extra\":\"Extra\" }";
+            byte[] originalJsonBytes = Encoding.UTF8.GetBytes(originalJson);
+            MemoryStream writeStream = new MemoryStream();
+            XmlDictionaryWriter jsonWriter = JsonReaderWriterFactory.CreateJsonWriter(writeStream, Encoding.UTF8, false);
+            XmlDictionaryReader jsonReader = JsonReaderWriterFactory.CreateJsonReader(originalJsonBytes, 0, originalJsonBytes.Length, XmlDictionaryReaderQuotas.Max);
+            jsonWriter.WriteNode(jsonReader, true);
+            jsonWriter.Flush();
+            Console.WriteLine(Encoding.UTF8.GetString(writeStream.ToArray()));
+            writeStream.Position = 0;
+
+            DataContractJsonSerializer dcjs = new DataContractJsonSerializer(typeof(SuperClass), new Type[] { typeof(SubClass) });
+            object o = dcjs.ReadObject(writeStream);
+            Console.WriteLine(o);
+        }
+    }
+
+    public class Post_717bf6bb_f26e_4bdb_bb24_a273846e868d
+    {
+        [DataContract]
+        public class InvoiceData
+        {
+            #region    Private Members
+            private System.Int32 mID = 0;    //    This CANNOT be a null value
+            private System.Int32 mDonorID = 0;    //    This CANNOT be a null value
+            private System.DateTime mInvoiceDate = DateTime.Now;    //    This CANNOT be a null value
+            private System.DateTime mDueDate = DateTime.Now;    //    This CANNOT be a null value
+            private List<TransactionData> mlTransactions = new List<TransactionData>();
+            private decimal mSubtotal = 0;
+            private decimal mOverdueFee = 0;
+            private decimal mTotal = 0;
+            #endregion Private Members
+
+            #region    Public Proprties
+            [DataMember]
+            public System.Int32 ID
+            {
+                get
+                {
+                    return mID;
+                }
+                set
+                {
+                    mID = value;
+                }
+            }
+
+            [DataMember]
+            public System.Int32 DonorID
+            {
+                get
+                {
+                    return mDonorID;
+                }
+                set
+                {
+                    mDonorID = value;
+                }
+            }
+
+            [DataMember]
+            public System.DateTime InvoiceDate
+            {
+                get
+                {
+                    return mInvoiceDate;
+                }
+                set
+                {
+                    mInvoiceDate = value;
+                }
+            }
+
+            [DataMember]
+            public System.DateTime DueDate
+            {
+                get
+                {
+                    return mDueDate;
+                }
+                set
+                {
+                    mDueDate = value;
+                }
+            }
+
+            [DataMember]
+            public List<TransactionData> lTransactions
+            {
+                get
+                {
+                    return mlTransactions;
+                }
+                set
+                {
+                    mlTransactions = value;
+                }
+            }
+
+            [DataMember]
+            public decimal Subtotal
+            {
+                get { return mSubtotal; }
+                set { mSubtotal = value; }
+            }
+
+            [DataMember]
+            public decimal OverdueFee
+            {
+                get { return mOverdueFee; }
+                set { mOverdueFee = value; }
+            }
+
+            [DataMember]
+            public decimal Total
+            {
+                get { return mTotal; }
+                set { mTotal = value; }
+            }
+
+            #endregion    Public Properties
+
+            public InvoiceData() : this(-1, -1, DateTime.Now, DateTime.Now, new List<TransactionData>(), 0, 0, 0) { }
+            public InvoiceData(System.Int32 pID, System.Int32 pDonorID, System.DateTime pInvoiceDate, System.DateTime pDueDate, List<TransactionData> plTransactions, decimal pSubtotal, decimal pOverdueFee, decimal pTotal)
+            {
+                mID = pID;
+                mDonorID = pDonorID;
+                mInvoiceDate = pInvoiceDate;
+                mDueDate = pDueDate;
+                mlTransactions = plTransactions;
+                mSubtotal = pSubtotal;
+                mOverdueFee = pOverdueFee;
+                mTotal = pTotal;
+            }
+        }
+
+
+        [DataContract]
+        public class TransactionData
+        {
+            #region    Private Members
+            private System.Int32 mID = 0;    //    This CANNOT be a null value
+            private System.Int32 mRecipientID = 0;    //    This CANNOT be a null value
+            private System.Int32 mDonorID = 0;    //    This CANNOT be a null value
+            private System.DateTime mWhenOccurred = DateTime.Now;    //    This CANNOT be a null value
+            private System.Decimal mAmount = 0.0M;    //    This CANNOT be a null value
+            #endregion Private Members
+
+            #region    Public Proprties
+            [DataMember]
+            public System.Int32 ID
+            {
+                get
+                {
+                    return mID;
+                }
+                set
+                {
+                    mID = value;
+                }
+            }
+
+            [DataMember]
+            public System.Int32 RecipientID
+            {
+                get
+                {
+                    return mRecipientID;
+                }
+                set
+                {
+                    mRecipientID = value;
+                }
+            }
+
+            [DataMember]
+            public System.Int32 DonorID
+            {
+                get
+                {
+                    return mDonorID;
+                }
+                set
+                {
+                    mDonorID = value;
+                }
+            }
+
+            [DataMember]
+            public System.DateTime WhenOccurred
+            {
+                get
+                {
+                    return mWhenOccurred;
+                }
+                set
+                {
+                    mWhenOccurred = value;
+                }
+            }
+
+            [DataMember]
+            public System.Decimal Amount
+            {
+                get
+                {
+                    return mAmount;
+                }
+                set
+                {
+                    mAmount = value;
+                }
+            }
+
+            #endregion    Public Properties
+
+            public TransactionData() : this(-1, -1, -1, DateTime.Now, -1) { }
+            public TransactionData(int pID, System.Int32 pRecipientID, System.Int32 pDonorID, System.DateTime pWhenOccurred, System.Decimal pAmount)
+            {
+                mID = pID;
+                mRecipientID = pRecipientID;
+                mDonorID = pDonorID;
+                mWhenOccurred = pWhenOccurred;
+                mAmount = pAmount;
+
+            }
+        }
+
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            InvoiceData Echo(InvoiceData input);
+        }
+        public class Service : ITest
+        {
+            public InvoiceData Echo(InvoiceData input)
+            {
+                return input;
+            }
+        }
+        static Binding GetBinding()
+        {
+            var result = new WSHttpBinding(SecurityMode.None);
+            //Change binding settings here
+            return result;
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), GetBinding(), "");
+            host.Description.Behaviors.Add(new ServiceMetadataBehavior { HttpGetEnabled = true });
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(GetBinding(), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+
+            InvoiceData input = new InvoiceData
+            {
+                DonorID = 1,
+                DueDate = DateTime.Now.AddDays(30),
+                ID = 1,
+                InvoiceDate = DateTime.Now,
+                OverdueFee = 10m,
+                Subtotal = 30m,
+                Total = 40m,
+                lTransactions = new List<TransactionData>
+                {
+                    new TransactionData
+                    {
+                        Amount = 20m,
+                        DonorID = 1,
+                        ID = 1,
+                        RecipientID = 1,
+                        WhenOccurred = DateTime.Now,
+                    },
+                    new TransactionData
+                    {
+                        Amount = 10m,
+                        DonorID = 1,
+                        ID = 2,
+                        RecipientID = 1,
+                        WhenOccurred = DateTime.Now,
+                    },
+                }
+            };
+            Console.WriteLine(proxy.Echo(input));
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            Post_409e2909_4ba0_436c_aa28_7099d6ccbd0d.Test();
+            Post_717bf6bb_f26e_4bdb_bb24_a273846e868d.Test();
         }
     }
 }

@@ -13954,11 +13954,93 @@ Date: Mon, 23 May 2011 06:56:18 GMT
         }
     }
 
+    public class Post_73c1b1c2_8085_46d0_9635_efcef68bcc70
+    {
+        public class Person
+        {
+            public string Name;
+            public int Age;
+            public Address Address;
+        }
+        public class Address
+        {
+            public string Street;
+            public string City;
+            public string State;
+        }
+        public static string SerializeToYaml(object obj)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("---");
+            SerializeToYaml(sb, "", obj);
+            sb.AppendLine("...");
+            return sb.ToString();
+        }
+        private static void SerializeToYaml(StringBuilder sb, string indent, object obj)
+        {
+            Type type = obj.GetType();
+            foreach (FieldInfo field in type.GetFields())
+            {
+                string name = field.Name;
+                object value = field.GetValue(obj);
+                switch (Type.GetTypeCode(value.GetType()))
+                {
+                    case TypeCode.String:
+                    case TypeCode.Int32:
+                        sb.Append(indent);
+                        sb.Append(name);
+                        sb.Append(": ");
+                        sb.Append(value);
+                        sb.AppendLine();
+                        break;
+                    case TypeCode.Object:
+                        sb.Append(indent);
+                        sb.Append(name);
+                        sb.AppendLine(":");
+                        SerializeToYaml(sb, indent + "    ", value);
+                        break;
+                    default:
+                        throw new ArgumentException("Not implemented yet");
+                }
+            }
+        }
+        [ServiceContract]
+        public class Service
+        {
+            [WebGet]
+            public Stream GetYaml()
+            {
+                Person p = new Person
+                {
+                    Name = "John Doe",
+                    Age = 25,
+                    Address = new Address { Street = "123 Tornado Alley", City = "East Centerville", State = "KS" },
+                };
+                WebOperationContext.Current.OutgoingResponse.ContentType = "text/plain";
+                return new MemoryStream(Encoding.UTF8.GetBytes(SerializeToYaml(p)));
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            Console.WriteLine(c.DownloadString(baseAddress + "/GetYaml"));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_8472985.Test();
+            Post_73c1b1c2_8085_46d0_9635_efcef68bcc70.Test();
         }
     }
 }
