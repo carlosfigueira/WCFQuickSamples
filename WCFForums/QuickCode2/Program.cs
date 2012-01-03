@@ -9937,7 +9937,7 @@ namespace QuickCode2
 
             host.Credentials.UserNameAuthentication.UserNamePasswordValidationMode = UserNamePasswordValidationMode.Custom;
             host.Credentials.UserNameAuthentication.CustomUserNamePasswordValidator = new MyPasswordValidator();
-            
+
             host.Open();
 
             EndpointAddress sr = new EndpointAddress(serviceUri);
@@ -9952,11 +9952,114 @@ namespace QuickCode2
         }
     }
 
+    // http://blogs.msdn.com/b/carlosfigueira/archive/2011/04/19/wcf-extensibility-message-inspectors.aspx
+    public class BlogPost_MessageInspectors_20111226
+    {
+        [ServiceContract]
+        public class Service
+        {
+            [WebGet]
+            public int AddGet(int x, int y) { return x + y; }
+            [WebInvoke(BodyStyle = WebMessageBodyStyle.WrappedRequest)]
+            public int AddPost(int x, int y) { return x + y; }
+        }
+        class MyBehavior : WebHttpBehavior, IDispatchMessageInspector
+        {
+            public override void ApplyDispatchBehavior(ServiceEndpoint endpoint, EndpointDispatcher endpointDispatcher)
+            {
+                base.ApplyDispatchBehavior(endpoint, endpointDispatcher);
+                endpointDispatcher.DispatchRuntime.MessageInspectors.Add(this);
+            }
+
+            public object AfterReceiveRequest(ref Message request, IClientChannel channel, InstanceContext instanceContext)
+            {
+                Console.WriteLine(request.Headers.To);
+                HttpRequestMessageProperty prop = request.Properties[HttpRequestMessageProperty.Name] as HttpRequestMessageProperty;
+                foreach (var header in prop.Headers.AllKeys)
+                {
+                    Console.WriteLine("{0}: {1}", header, prop.Headers[header]);
+                }
+                return null;
+            }
+
+            public void BeforeSendReply(ref Message reply, object correlationState)
+            {
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(Service), new WebHttpBinding(), "").Behaviors.Add(new MyBehavior());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            Console.WriteLine(c.DownloadString(baseAddress + "/AddGet?x=2&y=5"));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_fa34384b_9ffb_45f8_a59d_bfef91da4c52
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string Echo(string text);
+        }
+        public class Service : ITest
+        {
+            public string Echo(string text)
+            {
+                return text;
+            }
+        }
+        static Binding GetBinding()
+        {
+            var result = new WSHttpBinding(SecurityMode.None);
+            //Change binding settings here
+            return result;
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), GetBinding(), "");
+
+            ServiceBehaviorAttribute sba = host.Description.Behaviors.Find<ServiceBehaviorAttribute>();
+            if (sba == null)
+            {
+                sba = new ServiceBehaviorAttribute();
+                host.Description.Behaviors.Add(sba);
+            }
+
+            sba.UseSynchronizationContext = false;
+
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(GetBinding(), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+            Console.WriteLine(proxy.Echo("Hello"));
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            TransportCredentialOnlyTest.Test();
+            BlogPost_MessageInspectors_20111226.Test();
         }
     }
 }
