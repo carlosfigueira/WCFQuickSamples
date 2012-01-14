@@ -1,44 +1,44 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.ServiceModel;
-using System.ServiceModel.Channels;
-using System.ServiceModel.Description;
-using System.ServiceModel.Web;
-using UtilCS;
-using System.ServiceModel.Activation;
-using System.Xml.Linq;
-using System.IO;
-using System.Xml;
-using System.Net;
-using System.Collections.Specialized;
-using System.ServiceModel.Dispatcher;
-using System.Runtime.Serialization;
-using System.Threading;
-using System.Xml.Serialization;
-using System.Dynamic;
-using System.Reflection;
-using System.ServiceModel.Configuration;
-using System.Runtime.Serialization.Json;
 using System.CodeDom;
-using System.Configuration;
-using System.Collections.ObjectModel;
 using System.CodeDom.Compiler;
-using System.Security.Cryptography.X509Certificates;
-using System.Net.Security;
-using System.Drawing;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Configuration;
+using System.Diagnostics;
+using System.Drawing;
+using System.Dynamic;
+using System.Globalization;
+using System.IO;
 using System.IO.Compression;
-using System.ServiceModel.Discovery;
+using System.Linq;
+using System.Net;
+using System.Net.Security;
+using System.Reflection;
+using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Runtime.Serialization.Formatters.Soap;
-using System.Web;
-using System.Threading.Tasks;
-using System.Xml.Schema;
-using System.Diagnostics;
+using System.Runtime.Serialization.Json;
+using System.Security.Cryptography.X509Certificates;
+using System.ServiceModel;
+using System.ServiceModel.Activation;
+using System.ServiceModel.Channels;
+using System.ServiceModel.Configuration;
+using System.ServiceModel.Description;
+using System.ServiceModel.Discovery;
+using System.ServiceModel.Dispatcher;
+using System.ServiceModel.Web;
+using System.Text;
 using System.Text.RegularExpressions;
-using System.Globalization;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Web;
+using System.Xml;
+using System.Xml.Linq;
+using System.Xml.Schema;
+using System.Xml.Serialization;
+using UtilCS;
 
 namespace QuickCode1
 {
@@ -18538,11 +18538,258 @@ namespace QuickCode1
         }
     }
 
+    public class Post_f363c1d5_40db_49c9_9878_9a6ce5d72202
+    {
+        static readonly string BaseAddress = "http://" + Environment.MachineName + ":8000/Service";
+
+        [ServiceContract]
+        public interface IService1
+        {
+            [OperationContract]
+            Stream GetValue(string values);
+            [OperationContract, WebGet]
+            Stream GetValuesViaGet(string values);
+        }
+
+        public class Service1 : IService1
+        {
+            public Stream GetValue(string values)
+            {
+                string[] allValues = values.Split(',');
+                StringBuilder sb = new StringBuilder();
+                sb.Append("<Start-Data>");
+                foreach (var value in allValues)
+                {
+                    sb.Append(value);
+                    sb.Append(";");
+                }
+
+                sb.Append("<End-Data>");
+
+                byte[] resultBytes = Encoding.UTF8.GetBytes(sb.ToString());
+                WebOperationContext.Current.OutgoingResponse.ContentType = "text/plain";
+                return new MemoryStream(resultBytes);
+            }
+            public Stream GetValuesViaGet(string values)
+            {
+                return GetValue(values);
+            }
+        }
+
+        class Service1Client : ClientBase<IService1>, IService1
+        {
+            public Service1Client()
+                : base(new WebHttpBinding(), new EndpointAddress(BaseAddress))
+            {
+                this.Endpoint.Behaviors.Add(new WebHttpBehavior());
+            }
+
+            public Stream GetValue(string values)
+            {
+                return this.Channel.GetValue(values);
+            }
+
+            public Stream GetValuesViaGet(string values)
+            {
+                return this.Channel.GetValuesViaGet(values);
+            }
+        }
+
+        public static void Test()
+        {
+            ServiceHost host = new ServiceHost(typeof(Service1), new Uri(BaseAddress));
+            host.AddServiceEndpoint(typeof(IService1), new WebHttpBinding(), "").Behaviors.Add(new WebHttpBehavior());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            Console.WriteLine("Downloading using a 'normal' HTTP client (POST version)");
+            SendRequest(BaseAddress + "/GetValue", "POST", "application/json", "\"one,two,three,four\"");
+
+            Console.WriteLine("Downloading using a 'normal' HTTP client (GET version)");
+            SendRequest(BaseAddress + "/GetValuesViaGet?values=one,two,three,four", "GET", null, null);
+
+            Console.WriteLine("Downloading using a WCF client; using POST request");
+            Service1Client client = new Service1Client();
+            Stream s1 = client.GetValue("one,two,three,four");
+            Console.WriteLine(new StreamReader(s1).ReadToEnd());
+            Console.WriteLine();
+
+            Console.WriteLine("Downloading using a WCF client; using GET request");
+            s1 = client.GetValuesViaGet("one,two,three,four");
+            Console.WriteLine(new StreamReader(s1).ReadToEnd());
+            Console.WriteLine();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+
+        public static void SendRequest(string uri, string method, string contentType = null, string body = null)
+        {
+            HttpWebRequest req = (HttpWebRequest)HttpWebRequest.Create(uri);
+            req.Method = method;
+
+            if (!String.IsNullOrEmpty(contentType))
+            {
+                req.ContentType = contentType;
+            }
+
+            if (body != null)
+            {
+                byte[] bodyBytes = Encoding.UTF8.GetBytes(body);
+                req.GetRequestStream().Write(bodyBytes, 0, bodyBytes.Length);
+                req.GetRequestStream().Close();
+            }
+
+            HttpWebResponse resp;
+            try
+            {
+                resp = (HttpWebResponse)req.GetResponse();
+            }
+            catch (WebException e)
+            {
+                resp = (HttpWebResponse)e.Response;
+            }
+
+            Console.WriteLine("HTTP/{0} {1} {2}", resp.ProtocolVersion, (int)resp.StatusCode, resp.StatusDescription);
+            foreach (string headerName in resp.Headers.AllKeys)
+            {
+                Console.WriteLine("{0}: {1}", headerName, resp.Headers[headerName]);
+            }
+            Console.WriteLine();
+            Stream respStream = resp.GetResponseStream();
+            Console.WriteLine(new StreamReader(respStream).ReadToEnd());
+
+            Console.WriteLine();
+            Console.WriteLine("  *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*  ");
+            Console.WriteLine();
+        }
+    }
+
+    // http://stackoverflow.com/q/8854137/751090
+    public class StackOverflow_8854137
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string Echo(string text);
+        }
+        public class Service : ITest
+        {
+            public string Echo(string text)
+            {
+                return text;
+            }
+        }
+        class MyBehavior : IEndpointBehavior, IDispatchMessageInspector
+        {
+            public void AddBindingParameters(ServiceEndpoint endpoint, BindingParameterCollection bindingParameters)
+            {
+            }
+
+            public void ApplyClientBehavior(ServiceEndpoint endpoint, ClientRuntime clientRuntime)
+            {
+            }
+
+            public void ApplyDispatchBehavior(ServiceEndpoint endpoint, EndpointDispatcher endpointDispatcher)
+            {
+                endpointDispatcher.DispatchRuntime.MessageInspectors.Add(this);
+            }
+
+            public void Validate(ServiceEndpoint endpoint)
+            {
+            }
+
+            public object AfterReceiveRequest(ref Message request, IClientChannel channel, InstanceContext instanceContext)
+            {
+                try
+                {
+                    Guid tokenId = request.Headers.GetHeader<Guid>("Token", "System");
+                    Console.WriteLine("Token: {0}", tokenId);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("{0}: {1}", e.GetType().FullName, e.Message);
+                }
+
+                return null;
+            }
+
+            public void BeforeSendReply(ref Message reply, object correlationState)
+            {
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            ServiceEndpoint endpoint = host.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding(), "");
+            endpoint.Behaviors.Add(new MyBehavior());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(new BasicHttpBinding(), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+            Console.WriteLine(proxy.Echo("No token"));
+
+            using (new OperationContextScope((IContextChannel)proxy))
+            {
+                OperationContext.Current.OutgoingMessageHeaders.Add(MessageHeader.CreateHeader("Token", "System", Guid.NewGuid()));
+                Console.WriteLine(proxy.Echo("With token"));
+            }
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_9144d4a8_f12c_4e27_a64d_7ea9092b3300
+    {
+        [ServiceContract(Namespace = "http://my.namespace.com")]
+        public interface ITest
+        {
+            [OperationContract]
+            string Echo(string text);
+        }
+        [ServiceBehavior(Namespace = "http://my.namespace.com")]
+        public class Service : ITest
+        {
+            public string Echo(string text)
+            {
+                return text;
+            }
+        }
+        public static void Test()
+        {
+            Console.WriteLine(typeof(Service).FullName);
+            Console.WriteLine(typeof(ITest).FullName);
+
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Description.Behaviors.Add(new ServiceMetadataBehavior { HttpGetEnabled = true });
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            string wsdl = c.DownloadString(baseAddress + "?wsdl");
+            Console.WriteLine("Is tempuri in the WSDL? {0}", wsdl.IndexOf("tempuri", StringComparison.OrdinalIgnoreCase) >= 0);
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            Post_717bf6bb_f26e_4bdb_bb24_a273846e868d.Test();
+            Post_9144d4a8_f12c_4e27_a64d_7ea9092b3300.Test();
         }
     }
 }
