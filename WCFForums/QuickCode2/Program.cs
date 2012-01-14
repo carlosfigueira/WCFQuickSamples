@@ -10055,11 +10055,270 @@ namespace QuickCode2
         }
     }
 
+    public class MyCode_3
+    {
+        public class TranBalance
+        {
+            public float Commission;
+            public float Deposit;
+            public float Freeze;
+        }
+        public class Transaction
+        {
+            public TranBalance AfterTranBalance;
+            public string AgentId;
+            public float Amount;
+            public TranBalance BeforeTranBalance;
+            public string Channel;
+            public string OrigSystemTransTimeStamp;
+            public string OrigSysTransNo;
+            public string RegionCode;
+            public string TranType;
+        }
+        public class Header
+        {
+            public DateTime OriginalRequestDateTime;
+            public string OriginalRequestId;
+            public int PageNumber;
+            public int TotalPages;
+        }
+        public class Result
+        {
+            public string ReturnCode;
+            public string ReturnDescription;
+        }
+        public class TransactionResponse
+        {
+            public Header Header;
+            public Result Result;
+        }
+        private static List<Transaction> GetTransactionResponseTransactions(int numberOfTransactions)
+        {
+            // Create the transactions
+            List<Transaction> transactions = new List<Transaction>(numberOfTransactions);
+
+            for (int i = 0; i < numberOfTransactions; i++)
+            {
+                Transaction transaction = new Transaction()
+                {
+                    AfterTranBalance =
+                        new TranBalance() { Commission = 100F, Deposit = 200F, Freeze = 300F },
+                    AgentId = "100",
+                    Amount = 400F,
+                    BeforeTranBalance =
+                        new TranBalance() { Commission = 1F, Deposit = 2F, Freeze = 3F },
+                    Channel = "10001",
+                    OrigSystemTransTimeStamp = DateTime.Now.ToString(),
+                    OrigSysTransNo = "12345",
+                    RegionCode = "LeftRegion",
+                    TranType = "Commission"
+                };
+                transactions.Add(transaction);
+            }
+
+            return transactions;
+        }
+        static TransactionResponse GetTransactionResponse()
+        {
+            TransactionResponse transactionResponse = new TransactionResponse();
+
+            // Create the Header
+            transactionResponse.Header = new Header();
+            transactionResponse.Header.OriginalRequestDateTime = DateTime.Now;
+            transactionResponse.Header.OriginalRequestId = Guid.NewGuid().ToString();
+            transactionResponse.Header.PageNumber = 1;
+            transactionResponse.Header.TotalPages = 100;
+
+            // Create the result
+            transactionResponse.Result = new Result();
+            transactionResponse.Result.ReturnCode = "0";
+            transactionResponse.Result.ReturnDescription = "SUCCESS";
+
+            return transactionResponse;
+        }
+        public static void Test()
+        {
+            TransactionResponse response = GetTransactionResponse();
+            int numberOfTransactions = 3;
+            using (FileStream fs = File.Create("a.json"))
+            {
+                using (XmlDictionaryWriter w = JsonReaderWriterFactory.CreateJsonWriter(fs))
+                {
+                    w.WriteStartElement("root");
+                    w.WriteAttributeString("type", "object");
+                    WriteHeader(w, response.Header);
+                    WriteStartResult(w, response.Result);
+
+                    for (int i = 0; i < 10; i++)
+                    {
+                        List<Transaction> transactions = GetTransactionResponseTransactions(numberOfTransactions);
+                        WriteTransactions(w, transactions);
+                    }
+
+                    w.WriteEndElement(); // Result
+                    w.WriteEndElement(); // root
+                }
+            }
+        }
+        private static void WriteTransactions(XmlDictionaryWriter writer, List<Transaction> transactions)
+        {
+            DataContractJsonSerializer dcjs = new DataContractJsonSerializer(typeof(List<Transaction>), "Transactions");
+            dcjs.WriteObject(writer, transactions);
+        }
+        private static void WriteStartResult(XmlDictionaryWriter writer, Result result)
+        {
+            DataContractJsonSerializer dcjs = new DataContractJsonSerializer(typeof(Result), "Result");
+            dcjs.WriteStartObject(writer, result);
+            dcjs.WriteObjectContent(writer, result);
+        }
+        static void WriteHeader(XmlDictionaryWriter writer, Header header)
+        {
+            DataContractJsonSerializer dcjs = new DataContractJsonSerializer(typeof(Header), "Header");
+            dcjs.WriteObject(writer, header);
+        }
+    }
+
+    // http://stackoverflow.com/q/8669406/751090
+    public class StackOverflow_8669406
+    {
+        public class GetOrdersMessageFormatter : IClientMessageFormatter
+        {
+            readonly IClientMessageFormatter original;
+
+            public GetOrdersMessageFormatter(IClientMessageFormatter actual)
+            {
+                original = actual;
+            }
+
+            public void AddArrayNamespace(XmlNode node)
+            {
+                if (node != null)
+                {
+                    var attribute = node.OwnerDocument.CreateAttribute("test");
+                    attribute.Value = "test";
+                    node.Attributes.Append(attribute);
+                }
+            }
+
+            public object DeserializeReply(Message message, object[] parameters)
+            {
+                return original.DeserializeReply(message, parameters);
+            }
+
+            public Message SerializeRequest(MessageVersion messageVersion, object[] parameters)
+            {
+                Message newMessage = null;
+
+                var message = original.SerializeRequest(messageVersion, parameters);
+
+                if (message.Headers.Action == "urn:Mage_Api_Model_Server_HandlerAction")
+                {
+                    var doc = new XmlDocument();
+
+                    using (var reader = message.GetReaderAtBodyContents())
+                    {
+                        doc.Load(reader);
+                    }
+
+                    if (doc.DocumentElement != null)
+                    {
+                        switch (doc.DocumentElement.LocalName)
+                        {
+                            case "call":
+                                AddArrayNamespace(doc.SelectSingleNode("//args"));
+                                break;
+                        }
+                    }
+
+                    var ms = new MemoryStream();
+
+                    XmlWriterSettings ws = new XmlWriterSettings
+                    {
+                        CloseOutput = false,
+                    };
+
+                    using (var xw = XmlWriter.Create(ms, ws))
+                    {
+                        doc.Save(xw);
+                        xw.Flush();
+                    }
+
+                    Console.WriteLine(Encoding.UTF8.GetString(ms.ToArray()));
+
+                    ms.Position = 0;
+                    var xr = XmlReader.Create(ms);
+                    newMessage = Message.CreateMessage(message.Version, null, xr);
+                    newMessage.Headers.CopyHeadersFrom(message);
+                    newMessage.Properties.CopyProperties(message.Properties);
+                }
+
+                return newMessage;
+            }
+        }
+
+        [ServiceContract(Namespace = "")]
+        public interface ITest
+        {
+            [OperationContract(Action = "urn:Mage_Api_Model_Server_HandlerAction")]
+            int call(string args);
+        }
+        public class Service : ITest
+        {
+            public int call(string args)
+            {
+                return int.Parse(args);
+            }
+        }
+        class MyBehavior : IOperationBehavior
+        {
+            public void AddBindingParameters(OperationDescription operationDescription, BindingParameterCollection bindingParameters)
+            {
+            }
+
+            public void ApplyClientBehavior(OperationDescription operationDescription, ClientOperation clientOperation)
+            {
+                clientOperation.Formatter = new GetOrdersMessageFormatter(clientOperation.Formatter);
+            }
+
+            public void ApplyDispatchBehavior(OperationDescription operationDescription, DispatchOperation dispatchOperation)
+            {
+            }
+
+            public void Validate(OperationDescription operationDescription)
+            {
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding(), "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(new BasicHttpBinding(), new EndpointAddress(baseAddress));
+            foreach (OperationDescription operation in factory.Endpoint.Contract.Operations)
+            {
+                operation.Behaviors.Add(new MyBehavior());
+            }
+
+            ITest proxy = factory.CreateChannel();
+            Console.WriteLine(proxy.call("4455"));
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            BlogPost_MessageInspectors_20111226.Test();
+            StackOverflow_8669406.Test();
         }
     }
 }

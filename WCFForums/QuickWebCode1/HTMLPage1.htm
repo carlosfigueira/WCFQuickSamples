@@ -24,7 +24,7 @@
             });
         }
 
-        function Post_ca5941b4_bfcf_4546_a418_cc91a321c2fb() {
+        function Post_ca5941b4_bfcf_4546_a418_cc91a321c2fb_Basic() {
             var url = "/Post_ca5941b4_bfcf_4546_a418_cc91a321c2fb.svc";
             var request = "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\">" +
                     "<s:Body>" +
@@ -51,9 +51,42 @@
                 }
             });
         }
+
+        function Post_ca5941b4_bfcf_4546_a418_cc91a321c2fb_WS() {
+            var url = "/Post_ca5941b4_bfcf_4546_a418_cc91a321c2fb.svc/ws";
+            var request = "<s:Envelope " +
+        "xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" " +
+        "xmlns:a=\"http://www.w3.org/2005/08/addressing\">" +
+    "<s:Header>" +
+        "<a:Action s:mustUnderstand=\"1\">http://tempuri.org/IService1/Add</a:Action>" +
+        "<a:MessageID>urn:uuid:9cc71731-811b-4baa-9db3-e6faa9a1c347</a:MessageID>" +
+        "<a:ReplyTo><a:Address>http://www.w3.org/2005/08/addressing/anonymous</a:Address></a:ReplyTo>" +
+        "<a:To s:mustUnderstand=\"1\">http://localhost:17660/Post_ca5941b4_bfcf_4546_a418_cc91a321c2fb.svc/ws</a:To>" +
+    "</s:Header>" +
+    "<s:Body>" +
+        "<Add xmlns=\"http://tempuri.org/\">" +
+            "<x>44</x>" +
+            "<y>55</y>" +
+        "</Add>" +
+    "</s:Body>" +
+"</s:Envelope>";
+            $.ajax({
+                type: "POST",
+                url: url,
+                data: request,
+                contentType: "application/soap+xml",
+                success: function (data, textStatus, jqXHR) {
+                    $("#result").text(jqXHR.responseText);
+                },
+                error: function (jqXHR, textStatus, errorThrown) {
+                    $("#result").text("error");
+                }
+            });
+        }
     </script>
     <input type="button" value="StackOverflow 8537634" onclick="StackOverflow_8537634_Test();" /> <br />
-    <input type="button" value="MSDN ca5941b4-bfcf-4546-a418-cc91a321c2fb" onclick="Post_ca5941b4_bfcf_4546_a418_cc91a321c2fb();" />
+    <input type="button" value="MSDN ca5941b4-bfcf-4546-a418-cc91a321c2fb - Basic" onclick="Post_ca5941b4_bfcf_4546_a418_cc91a321c2fb_Basic();" /><br />
+    <input type="button" value="MSDN ca5941b4-bfcf-4546-a418-cc91a321c2fb - WS" onclick="Post_ca5941b4_bfcf_4546_a418_cc91a321c2fb_WS();" /><br />
     <div id='result'></div>
 </body>
 </html>
