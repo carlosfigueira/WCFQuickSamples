@@ -12,24 +12,36 @@ using System.ServiceModel.Security;
 using System.IdentityModel.Selectors;
 using System.IdentityModel.Tokens;
 using WcfSamples.DynamicProxy;
+using System.Runtime.Serialization;
+using System.Reflection;
 
-namespace UsingDynamicProxy
+namespace Post_4073aaa2_1ac9_427b_a0a7_dd0c68ee146c
 {
-    public class Post_4073aaa2_1ac9_427b_a0a7_dd0c68ee146c
+    [ServiceContract]
+    public interface ITest
     {
-        [ServiceContract]
-        public interface ITest
+        [OperationContract]
+        string Hello();
+    }
+    public class Service : ITest
+    {
+        public string Hello()
         {
-            [OperationContract]
-            string Hello();
+            return "Hello, " + OperationContext.Current.ServiceSecurityContext.PrimaryIdentity.Name;
         }
-        public class Service : ITest
+    }
+    class MyPasswordValidator : UserNamePasswordValidator
+    {
+        public override void Validate(string userName, string password)
         {
-            public string Hello()
+            if (userName != password)
             {
-                return "Hello, " + OperationContext.Current.ServiceSecurityContext.PrimaryIdentity.Name;
+                throw new SecurityTokenException("Invalid password");
             }
         }
+    }
+    class MainClass
+    {
         static Binding GetBinding()
         {
             var result = new BasicHttpBinding(BasicHttpSecurityMode.Transport);
@@ -40,16 +52,6 @@ namespace UsingDynamicProxy
         {
             Console.WriteLine("Validating for {0}", certificate.Subject);
             return true;
-        }
-        class MyPasswordValidator : UserNamePasswordValidator
-        {
-            public override void Validate(string userName, string password)
-            {
-                if (userName != password)
-                {
-                    throw new SecurityTokenException("Invalid password");
-                }
-            }
         }
         public static void Test()
         {
@@ -80,12 +82,110 @@ namespace UsingDynamicProxy
             host.Close();
         }
     }
+}
 
+namespace Post_da7d768d_ccc2_4011_a010_40f20dfa48e4
+{
+    [ServiceContract]
+    public interface IService
+    {
+
+        [OperationContract]
+        string GetData(int value);
+
+        [OperationContract]
+        CompositeType GetDataUsingDataContract(CompositeType composite);
+    }
+
+    [DataContract]
+    public class CompositeType
+    {
+        bool boolValue = true;
+        string stringValue = "Hello ";
+
+        [DataMember]
+        public bool BoolValue
+        {
+            get { return boolValue; }
+            set { boolValue = value; }
+        }
+
+        [DataMember]
+        public string StringValue
+        {
+            get { return stringValue; }
+            set { stringValue = value; }
+        }
+    }
+
+    public class Service : IService
+    {
+        public string GetData(int value)
+        {
+            return "You entered: " + value;
+        }
+
+        public CompositeType GetDataUsingDataContract(CompositeType composite)
+        {
+            if (composite.BoolValue)
+            {
+                composite.StringValue = composite.StringValue.ToUpperInvariant();
+            }
+            else
+            {
+                composite.StringValue = composite.StringValue.ToLowerInvariant();
+            }
+
+            return composite;
+        }
+    }
+
+    class MainClass
+    {
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(IService), new BasicHttpBinding(), "");
+            host.Description.Behaviors.Add(new ServiceMetadataBehavior { HttpGetEnabled = true });
+
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            DynamicProxyFactory factory = new DynamicProxyFactory(baseAddress + "?wsdl");
+
+            DynamicProxy dynamicProxy = factory.CreateProxy("IService");
+            Console.WriteLine(dynamicProxy.CallMethod("GetData", 123));
+
+            Type proxyType = dynamicProxy.ProxyType;
+            MethodInfo getDataUsingDCMethod = proxyType.GetMethod("GetDataUsingDataContract");
+            Type dcType = getDataUsingDCMethod.GetParameters()[0].ParameterType;
+            DynamicObject obj = new DynamicObject(dcType);
+            obj.CallConstructor();
+            obj.SetProperty("BoolValue", true);
+            obj.SetProperty("StringValue", "Hello world");
+
+            DynamicObject result = new DynamicObject(
+                dynamicProxy.CallMethod(
+                    "GetDataUsingDataContract",
+                    obj.ObjectInstance));
+
+            Console.WriteLine(result.GetProperty("StringValue"));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+}
+
+namespace UsingDynamicProxy
+{
     class Program
     {
         static void Main(string[] args)
         {
-            Post_4073aaa2_1ac9_427b_a0a7_dd0c68ee146c.Test();
+            Post_da7d768d_ccc2_4011_a010_40f20dfa48e4.MainClass.Test();
         }
     }
 }

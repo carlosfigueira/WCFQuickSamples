@@ -10314,11 +10314,496 @@ namespace QuickCode2
         }
     }
 
+    public class NoSecurityWSHttpBinding
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            int Add(int x, int y);
+        }
+        public class Service : ITest
+        {
+            public int Add(int x, int y)
+            {
+                return x + y;
+            }
+        }
+        static Binding GetBinding()
+        {
+            var result = new WSHttpBinding(SecurityMode.None);
+            //Change binding settings here
+            return result;
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), GetBinding(), "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(GetBinding(), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+            Console.WriteLine(proxy.Add(4, 5));
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_aa531fac_f9e6_4e24_8f76_780cfec6cb87
+    {
+        [ServiceContract]
+        public class Service
+        {
+            [WebInvoke(Method = "PUT", UriTemplate = "Graphs/{library}/{subjectLocalPart}/{predicateLocalPart}/{objectPart}/{languageCode}")]
+            public string CreateTriple(string library, string subjectLocalPart, string predicateLocalPart, string objectPart, string languageCode)
+            {
+                return string.Format("{0}-{1}-{2}-{3}-{4}", library, subjectLocalPart, predicateLocalPart, objectPart, languageCode);
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            Console.WriteLine("No '#'");
+            Util.SendRequest(baseAddress + "/Graphs/myLib/123abc/content-HasA/456def-ghik/en-us", "PUT", "application/json", "0");
+
+            Console.WriteLine("Simple '#' (encoded)");
+            Util.SendRequest(baseAddress + "/Graphs/myLib/123abc/content%23HasA/456def%23ghik/en-us", "PUT", "application/json", "0");
+
+            Console.WriteLine("Escaped '#'");
+            Util.SendRequest(baseAddress + "/Graphs/myLib/123abc/content%2523HasA/456def%2523ghik/en-us", "PUT", "application/json", "0");
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_8e4e4812_9f8a_4a3a_b1af_b8e14b2af3d4
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            [Description("Returns the summary for a email report")]
+            [WebInvoke(Method = "POST", UriTemplate = "{Category}/Report/")]
+            [XmlSerializerFormat]
+            XmlDocument GetReport(string Category, XmlElement xmlData);
+        }
+        public class Service : ITest
+        {
+            public XmlDocument GetReport(string Category, XmlElement xmlData)
+            {
+                XmlDocument doc = new XmlDocument();
+                doc.LoadXml(xmlData.OuterXml);
+                return doc;
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebHttpBehavior behavior = new WebHttpBehavior { HelpEnabled = true };
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), new WebHttpBinding(), "").Behaviors.Add(behavior);
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            string input = "<root><foo>bar</foo><list><item id='1'>Bread</item><item id='2'>Milk</item></list></root>";
+            WebClient c = new WebClient();
+            c.Headers[HttpRequestHeader.ContentType] = "text/xml";
+            Console.WriteLine(c.UploadString(baseAddress + "/Cat/Report/", input));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_f2a70b26_fb1c_4c6a_a48a_646b2dd70760
+    {
+        [DataContract]
+        public class Employee
+        {
+            [DataMember]
+            public string Name { get; set; }
+            [DataMember]
+            public string Address { get; set; }
+            [IgnoreDataMember]
+            public int Age { get; set; }
+
+            public string Nickname { get; set; }
+            [DataMember]
+            public List<Order> theOrders { get; set; }
+            [DataMember]
+            public List<Payment> thePayments { get; set; }
+        }
+        public class Order { }
+        public class Payment { }
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            Employee Echo(Employee input);
+        }
+        public class Service : ITest
+        {
+            public Employee Echo(Employee input)
+            {
+                return input;
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding(), "");
+            host.Description.Behaviors.Add(new ServiceMetadataBehavior { HttpGetEnabled = true });
+            host.Open();
+            Console.WriteLine("Host opened at {0}", baseAddress);
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/8951319/751090
+    public class StackOverflow_8951319
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string Echo(string text);
+            [OperationContract, XmlSerializerFormat]
+            XmlDocument GetDocument();
+        }
+        public class Service : ITest
+        {
+            public string Echo(string text)
+            {
+                return text;
+            }
+
+            public XmlDocument GetDocument()
+            {
+                XmlDocument doc = new XmlDocument();
+                doc.LoadXml(@"<products>
+      <product id='1'>
+        <name>Bread</name>
+      </product>
+      <product id='2'>
+        <name>Milk</name>
+      </product>
+      <product id='3'>
+        <name>Coffee</name>
+      </product>
+    </products>");
+                return doc;
+            }
+        }
+        static Binding GetBinding()
+        {
+            var result = new WSHttpBinding(SecurityMode.None);
+            //Change binding settings here
+            return result;
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), GetBinding(), "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(GetBinding(), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+            Console.WriteLine(proxy.Echo("Hello"));
+
+            Console.WriteLine(proxy.GetDocument().OuterXml);
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_bcd94cf9_2881_4081_a05b_771a6e6f9c06
+    {
+        public class LogMessageAttribute : Attribute, IOperationBehavior
+        {
+            public void AddBindingParameters(OperationDescription operationDescription, BindingParameterCollection bindingParameters)
+            {
+            }
+
+            public void ApplyClientBehavior(OperationDescription operationDescription, ClientOperation clientOperation)
+            {
+            }
+
+            public void ApplyDispatchBehavior(OperationDescription operationDescription, DispatchOperation dispatchOperation)
+            {
+                LoggerInspector inspector = dispatchOperation.Parent.MessageInspectors
+                    .Where(x => x is LoggerInspector)
+                    .FirstOrDefault() as LoggerInspector;
+
+                if (inspector != null)
+                {
+                    inspector.AddOperation(operationDescription);
+                }
+                else
+                {
+                    inspector = new LoggerInspector(operationDescription);
+                    dispatchOperation.Parent.MessageInspectors.Add(inspector);
+                }
+            }
+
+            public void Validate(OperationDescription operationDescription)
+            {
+            }
+        }
+
+        class LoggerInspector : IDispatchMessageInspector
+        {
+            List<string> operationsToLog = new List<string>();
+            public LoggerInspector(OperationDescription operation)
+            {
+                this.AddOperation(operation);
+            }
+
+            internal void AddOperation(OperationDescription operation)
+            {
+                this.operationsToLog.Add(operation.Messages[0].Action);
+            }
+
+            public object AfterReceiveRequest(ref Message request, IClientChannel channel, InstanceContext instanceContext)
+            {
+                if (this.operationsToLog.Contains(request.Headers.Action))
+                {
+                    Console.WriteLine("Request: {0}", request);
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            public void BeforeSendReply(ref Message reply, object correlationState)
+            {
+                bool toLog = (bool)correlationState;
+                if (toLog)
+                {
+                    Console.WriteLine("Reply: {0}", reply);
+                }
+            }
+        }
+
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string Echo(string text);
+
+            [OperationContract]
+            [LogMessage]
+            int Add(int x, int y);
+            
+            [OperationContract]
+            [LogMessage]
+            int Subtract(int x, int y);
+        }
+        public class Service : ITest
+        {
+            public string Echo(string text)
+            {
+                return text;
+            }
+
+            public int Add(int x, int y)
+            {
+                return x + y;
+            }
+
+            public int Subtract(int x, int y)
+            {
+                return x - y;
+            }
+        }
+        static Binding GetBinding()
+        {
+            var result = new WSHttpBinding(SecurityMode.None);
+            return result;
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), GetBinding(), "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(GetBinding(), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+            Console.WriteLine(proxy.Echo("Hello"));
+            Console.WriteLine(proxy.Add(4, 5));
+            Console.WriteLine(proxy.Subtract(4, 5));
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_b5b4dd05_50cf_4799_a892_be706868f5a7
+    {
+        [ServiceContract]
+        public interface ISecureCalculator
+        {
+            [OperationContract, WebGet]
+            int Add(int x, int y);
+            [OperationContract, WebGet]
+            int Subtract(int x, int y);
+        }
+        public class SecureCalculatorService : ISecureCalculator
+        {
+            public int Add(int x, int y)
+            {
+                return x + y;
+            }
+
+            public int Subtract(int x, int y)
+            {
+                return x - y;
+            }
+        }
+        class MyApiKeyInspector : IEndpointBehavior, IDispatchMessageInspector
+        {
+            public void AddBindingParameters(ServiceEndpoint endpoint, BindingParameterCollection bindingParameters)
+            {
+            }
+
+            public void ApplyClientBehavior(ServiceEndpoint endpoint, ClientRuntime clientRuntime)
+            {
+            }
+
+            public void ApplyDispatchBehavior(ServiceEndpoint endpoint, EndpointDispatcher endpointDispatcher)
+            {
+                endpointDispatcher.DispatchRuntime.MessageInspectors.Add(this);
+                int index = endpointDispatcher.DispatchRuntime.ChannelDispatcher.ErrorHandlers.Count - 1;
+                IErrorHandler webErrorHandler = endpointDispatcher.DispatchRuntime.ChannelDispatcher.ErrorHandlers[index];
+                endpointDispatcher.DispatchRuntime.ChannelDispatcher.ErrorHandlers[index] = new MyErrorHandler(webErrorHandler);
+            }
+
+            public void Validate(ServiceEndpoint endpoint)
+            {
+            }
+
+            public object AfterReceiveRequest(ref Message request, IClientChannel channel, InstanceContext instanceContext)
+            {
+                HttpRequestMessageProperty prop;
+                prop = (HttpRequestMessageProperty)request.Properties[HttpRequestMessageProperty.Name];
+                string apiKey = prop.Headers["X-ApiKey"];
+                if (apiKey != null && apiKey.StartsWith("TheSecretKey:"))
+                {
+                    string user = apiKey.Substring("TheSecretKey:".Length);
+                    GenericPrincipal principal = new GenericPrincipal(new GenericIdentity(user), new string[] { "user" });
+                    request.Properties.Add("Principal", principal);
+                }
+                else
+                {
+                    throw new UnauthorizedAccessException();
+                }
+
+                return null;
+            }
+
+            public void BeforeSendReply(ref Message reply, object correlationState)
+            {
+            }
+        }
+
+        class MyErrorHandler : IErrorHandler
+        {
+            IErrorHandler original;
+            public MyErrorHandler(IErrorHandler original)
+            {
+                this.original = original;
+            }
+
+            public bool HandleError(Exception error)
+            {
+                return error is UnauthorizedAccessException
+                    || this.original.HandleError(error);
+            }
+
+            public void ProvideFault(Exception error, MessageVersion version, ref Message fault)
+            {
+                if (error is UnauthorizedAccessException)
+                {
+                    fault = Message.CreateMessage(version, "action", (object)null);
+                    HttpResponseMessageProperty prop = new HttpResponseMessageProperty();
+                    prop.StatusCode = HttpStatusCode.Unauthorized;
+                    prop.SuppressEntityBody = true; 
+                    fault.Properties.Add(HttpResponseMessageProperty.Name, prop);
+                }
+                else
+                {
+                    this.original.ProvideFault(error, version, ref fault);
+                }
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(SecureCalculatorService), new Uri(baseAddress));
+            ServiceEndpoint webEndpoint = host.AddServiceEndpoint(typeof(ISecureCalculator), new WebHttpBinding(), "web");
+            webEndpoint.Behaviors.Add(new WebHttpBehavior());
+            webEndpoint.Behaviors.Add(new MyApiKeyInspector());
+
+            ServiceEndpoint wsEndpoint = host.AddServiceEndpoint(typeof(ISecureCalculator), new WSHttpBinding(), "ws");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            Util.SendRequest(baseAddress + "/web/Add?x=4&y=8", "GET", null, null);
+            Dictionary<string, string> headers = new Dictionary<string, string>();
+            headers.Add("X-ApiKey", "TheSecretKey:JohnDoe");
+            Util.SendRequest(baseAddress + "/web/Subtract?x=4&y=8", "GET", null, null, headers);
+
+            ChannelFactory<ISecureCalculator> factory = new ChannelFactory<ISecureCalculator>(new WSHttpBinding(), new EndpointAddress(baseAddress + "/ws"));
+            ISecureCalculator proxy = factory.CreateChannel();
+            Console.WriteLine(proxy.Add(4, 5));
+            Console.WriteLine(proxy.Subtract(4, 5));
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_8669406.Test();
+            Post_b5b4dd05_50cf_4799_a892_be706868f5a7.Test();
         }
     }
 }
