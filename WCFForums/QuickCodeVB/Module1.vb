@@ -10,6 +10,388 @@ Imports System.ServiceModel.Web
 Imports System.ServiceModel.Activation
 Imports System.Text
 Imports System.Xml
+Imports System.ComponentModel
+Imports System.Xml.Serialization
+Imports System.Xml.Schema
+
+Public Class Post_ed4dee9d_6a49_4bf9_9724_cbf873105e62
+    <ServiceContract(Name:="ABCService", Namespace:="http://abc.com/WCFService/")> _
+    Public Interface IService
+        <OperationContract()> _
+        <WebInvoke(UriTemplate:="/Add", BodyStyle:=WebMessageBodyStyle.Bare, requestFormat:=WebMessageFormat.Xml, responseFormat:=WebMessageFormat.Xml, Method:="POST")> _
+        Function Add(ByVal sXML As String) As String
+    End Interface
+
+    <AspNetCompatibilityRequirements(RequirementsMode:=AspNetCompatibilityRequirementsMode.Allowed)> _
+    Public Class Service
+        Implements IService
+        Public Function Add(ByVal sXML As String) As String Implements IService.Add
+            Return "I am getting:" & sXML
+        End Function
+    End Class
+
+    Public Shared Sub Test()
+        Dim baseAddress As String = "http://localhost:8000/Service"
+        Dim host As ServiceHost = New ServiceHost(GetType(Service), New Uri(baseAddress))
+        host.AddServiceEndpoint(GetType(IService), New WebHttpBinding(), "").Behaviors.Add(New WebHttpBehavior())
+        host.Open()
+        Console.WriteLine("Host opened")
+
+        Util.SendRequest("POST", baseAddress + "/Add", "text/xml", "<string xmlns=""http://schemas.microsoft.com/2003/10/Serialization/"">This is a string</string>")
+    End Sub
+End Class
+
+Public Class Post_191798e0_2c9a_447c_b72a_b1ca241146e3
+    '<ServiceContract()> _
+    Public Interface ITest
+        Property MyProp() As Integer
+    End Interface
+    <ServiceContract()> _
+    Public Class MyService
+        'Implements ITest
+
+        Shared i As Integer
+
+        'Public Property MyProp() As Integer Implements ITest.MyProp
+        Public Property MyProp() As Integer
+            <OperationContract()> _
+            Get
+                Console.WriteLine("[server] get_MyProp")
+                Return i
+            End Get
+            <OperationContract()> _
+            Set(ByVal value As Integer)
+                Console.WriteLine("[server] set_MyProp")
+                i = value
+            End Set
+        End Property
+    End Class
+
+    Public Shared Sub Test()
+        Dim baseAddress As String = "http://localhost:8000/Service"
+        Dim host As New ServiceHost(GetType(MyService), New Uri(baseAddress))
+        host.AddServiceEndpoint(GetType(MyService), New BasicHttpBinding(), "")
+        Dim smb As ServiceMetadataBehavior = New ServiceMetadataBehavior
+        smb.HttpGetEnabled = True
+        host.Description.Behaviors.Add(smb)
+        host.Open()
+
+        'Dim factory = New ChannelFactory(Of ITest)(New BasicHttpBinding(), New EndpointAddress(baseAddress))
+        'Dim proxy = factory.CreateChannel()
+        'proxy.MyProp = 123
+        'proxy.MyProp = proxy.MyProp + 1
+        'Console.WriteLine(proxy.MyProp)
+        Console.WriteLine("Press ENTER to close")
+        Console.ReadLine()
+    End Sub
+End Class
+
+Public Class Post_ed4dee9d_6a49_4bf9_9724_cbf873105e62_AllXml
+    <ServiceContract(Name:="ABCService", Namespace:="http://abc.com/WCFService/")> _
+    Public Interface IService
+        <OperationContractAttribute()> _
+        <WebInvoke(UriTemplate:="/Add", BodyStyle:=WebMessageBodyStyle.Bare, requestFormat:=WebMessageFormat.Xml, responseFormat:=WebMessageFormat.Xml, Method:="POST")> _
+        Function Add(ByVal sXML As XmlElement) As String
+    End Interface
+
+    <AspNetCompatibilityRequirements(RequirementsMode:=AspNetCompatibilityRequirementsMode.Allowed)> _
+    Public Class Service
+        Implements IService
+        Public Function Add(ByVal sXML As XmlElement) As String Implements IService.Add
+            Return "I am getting:" & sXML.OuterXml
+        End Function
+    End Class
+
+    Public Shared Sub Test()
+        Dim baseAddress As String = "http://localhost:8000/Service"
+        Dim host As ServiceHost = New ServiceHost(GetType(Service), New Uri(baseAddress))
+        host.AddServiceEndpoint(GetType(IService), New WebHttpBinding(), "").Behaviors.Add(New WebHttpBehavior())
+        host.Open()
+        Console.WriteLine("Host opened")
+
+        Util.SendRequest("POST", baseAddress + "/Add", "text/xml", "<names><name>TEST</name></names>")
+    End Sub
+End Class
+
+Public Class Post_ed4dee9d_6a49_4bf9_9724_cbf873105e62_Anything
+    <ServiceContract(Name:="ABCService", Namespace:="http://abc.com/WCFService/")> _
+    Public Interface IService
+        <OperationContract()> _
+        <WebInvoke(UriTemplate:="/Add", BodyStyle:=WebMessageBodyStyle.Bare, requestFormat:=WebMessageFormat.Xml, responseFormat:=WebMessageFormat.Xml, Method:="POST")> _
+        Function Add(ByVal sXML As Stream) As Stream
+    End Interface
+
+    <AspNetCompatibilityRequirements(RequirementsMode:=AspNetCompatibilityRequirementsMode.Allowed)> _
+    Public Class Service
+        Implements IService
+        Public Function Add(ByVal sXML As Stream) As Stream Implements IService.Add
+            Dim result As String = "I am getting: " & New StreamReader(sXML).ReadToEnd
+            WebOperationContext.Current.OutgoingResponse.ContentType = "text/plain"
+            Return New MemoryStream(Encoding.UTF8.GetBytes(result))
+        End Function
+    End Class
+    Class MyRawMapper
+        Inherits WebContentTypeMapper
+        Public Overrides Function GetMessageFormatForContentType(ByVal contentType As String) As WebContentFormat
+            Return WebContentFormat.Raw
+        End Function
+    End Class
+    Shared Function GetBinding()
+        Dim result As CustomBinding = New CustomBinding(New WebHttpBinding())
+        result.Elements.Find(Of WebMessageEncodingBindingElement).ContentTypeMapper = New MyRawMapper()
+        Return result
+    End Function
+    Public Shared Sub Test()
+        Dim baseAddress As String = "http://localhost:8000/Service"
+        Dim host As ServiceHost = New ServiceHost(GetType(Service), New Uri(baseAddress))
+        host.AddServiceEndpoint(GetType(IService), GetBinding(), "").Behaviors.Add(New WebHttpBehavior())
+        host.Open()
+        Console.WriteLine("Host opened")
+
+        Util.SendRequest("POST", baseAddress + "/Add", "text/xml", "<names><name>TEST</name></names>")
+        Util.SendRequest("POST", baseAddress + "/Add", "text/plain", "Hello world")
+    End Sub
+End Class
+
+Public Class Util
+    Public Shared Function SendRequest(ByVal method As String, _
+                                       ByVal uri As String, _
+                                       Optional ByVal contentType As String = Nothing, _
+                                       Optional ByVal body As String = Nothing) As String
+        Dim responseBody As String = Nothing
+
+        Dim req As HttpWebRequest = CType(HttpWebRequest.Create(uri), HttpWebRequest)
+        req.Method = method
+        If Not String.IsNullOrEmpty(contentType) Then
+            req.ContentType = contentType
+        End If
+        If Not String.IsNullOrEmpty(body) Then
+            Dim bodyBytes As Byte() = Encoding.UTF8.GetBytes(body)
+            req.GetRequestStream().Write(bodyBytes, 0, bodyBytes.Length)
+            req.GetRequestStream().Close()
+        End If
+
+        Dim resp As HttpWebResponse
+        Try
+            resp = CType(req.GetResponse(), HttpWebResponse)
+        Catch e As WebException
+            resp = CType(e.Response, HttpWebResponse)
+        End Try
+
+        Console.WriteLine("HTTP/{0} {1} {2}", resp.ProtocolVersion, CType(resp.StatusCode, Integer), resp.StatusDescription)
+        For Each headerName As String In resp.Headers.AllKeys
+            Console.WriteLine("{0}: {1}", headerName, resp.Headers(headerName))
+        Next
+        Console.WriteLine()
+        Dim respStream As Stream = resp.GetResponseStream()
+        If respStream IsNot Nothing Then
+            responseBody = New StreamReader(respStream).ReadToEnd()
+            Console.WriteLine(responseBody)
+        Else
+            Console.WriteLine("HttpWebResponse.GetResponseStream returned null")
+        End If
+        Console.WriteLine()
+        Console.WriteLine("  *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*  ")
+        Console.WriteLine()
+
+        Return responseBody
+    End Function
+End Class
+
+Public Class Post_525a3381_3457_4a09_bbd5_57080a56771d
+    <ServiceKnownType(GetType(OverflowException)), ServiceContract()> _
+    Public Interface IService1
+        <OperationContract()> _
+        Sub HandleEx(ByVal ex As Exception)
+    End Interface
+
+    <Serializable()> _
+    Public Class TestException
+        Implements IService1
+        Public Sub HandleEx(ByVal ex As System.Exception) Implements IService1.HandleEx
+            MsgBox(ex.ToString)
+        End Sub
+    End Class
+
+    Public Shared Sub Test()
+        Dim baseAddress As String = "http://" + Environment.MachineName + ":8000/Service"
+        Dim host As ServiceHost = New ServiceHost(GetType(TestException), New Uri(baseAddress))
+        host.AddServiceEndpoint(GetType(IService1), New BasicHttpBinding(), "")
+        host.Open()
+
+        Dim factory As ChannelFactory(Of IService1) = New ChannelFactory(Of IService1)(New BasicHttpBinding(), New EndpointAddress(baseAddress))
+        Dim proxy As IService1 = factory.CreateChannel()
+        Try
+            Dim a As Integer
+            a = 0
+            a = 100 / a
+        Catch ex As Exception
+            proxy.HandleEx(ex)
+        End Try
+    End Sub
+End Class
+
+Public Class Post_3396ffba_4e33_40f2_b8e6_9fcb7f0b3a88
+
+    Private Shared allNodes As List(Of String) = New List(Of String)
+
+    <ServiceContract()> Public Interface ITest
+        <OperationContract()> Function Add(ByVal x As Integer, ByVal y As Integer) As Integer
+    End Interface
+
+    Public Class Service
+        Implements ITest
+
+        Public Function Add(ByVal x As Integer, ByVal y As Integer) As Integer Implements ITest.Add
+            Return x + y
+        End Function
+    End Class
+
+    Public Class MyInspector
+        Implements IEndpointBehavior
+        Implements IClientMessageInspector
+
+        Public Sub AddBindingParameters(ByVal endpoint As ServiceEndpoint, ByVal bindingParameters As BindingParameterCollection) Implements IEndpointBehavior.AddBindingParameters
+
+        End Sub
+
+        Public Sub ApplyClientBehavior(ByVal endpoint As ServiceEndpoint, ByVal clientRuntime As ClientRuntime) Implements IEndpointBehavior.ApplyClientBehavior
+            clientRuntime.MessageInspectors.Add(Me)
+        End Sub
+
+        Public Sub ApplyDispatchBehavior(ByVal endpoint As ServiceEndpoint, ByVal endpointDispatcher As EndpointDispatcher) Implements IEndpointBehavior.ApplyDispatchBehavior
+
+        End Sub
+
+        Public Sub Validate(ByVal endpoint As ServiceEndpoint) Implements IEndpointBehavior.Validate
+
+        End Sub
+
+        Public Sub AfterReceiveReply(ByRef reply As Message, ByVal correlationState As Object) Implements IClientMessageInspector.AfterReceiveReply
+            Dim xdr As XmlDictionaryReader = reply.GetReaderAtBodyContents() ' reply has been read; need to re-create it later
+            Dim XMLDoc As XmlDocument = New XmlDocument()
+            XMLDoc.Load(xdr)
+
+            'Saving the information in a "global" variable
+            For Each node As XmlElement In XMLDoc.ChildNodes
+                allNodes.Add(node.InnerText)
+            Next
+
+            'Recreating the reply
+            Dim memStream As New MemoryStream
+            Dim writer As XmlDictionaryWriter = XmlDictionaryWriter.CreateBinaryWriter(memStream)
+            XMLDoc.WriteTo(writer)
+            writer.Flush()
+            memStream.Position = 0
+            Dim reader As XmlDictionaryReader = XmlDictionaryReader.CreateBinaryReader(memStream, XmlDictionaryReaderQuotas.Max)
+            Dim newReply As Message = Message.CreateMessage(reply.Version, Nothing, reader)
+            newReply.Headers.CopyHeadersFrom(reply)
+            newReply.Properties.CopyProperties(reply.Properties)
+
+            'Now adding a new property into the "reply"
+            newReply.Properties.Add(name:="MyNewProperty", [property]:="Value for my property")
+
+            reply = newReply
+        End Sub
+
+        Public Function BeforeSendRequest(ByRef request As Message, ByVal channel As IClientChannel) As Object Implements IClientMessageInspector.BeforeSendRequest
+            Return Nothing
+        End Function
+    End Class
+
+    Public Shared Sub Test()
+        Dim baseAddress As String = "http://" + Environment.MachineName + ":8000/Service"
+        Dim host As New ServiceHost(GetType(Service), New Uri(baseAddress))
+        host.AddServiceEndpoint(GetType(ITest), New BasicHttpBinding(), "")
+        Dim smb As ServiceMetadataBehavior = New ServiceMetadataBehavior
+        smb.HttpGetEnabled = True
+        host.Description.Behaviors.Add(smb)
+        host.Open()
+
+        Dim factory = New ChannelFactory(Of ITest)(New BasicHttpBinding(), New EndpointAddress(baseAddress))
+        factory.Endpoint.Behaviors.Add(New MyInspector())
+        Dim proxy = factory.CreateChannel()
+        Using New OperationContextScope(CType(proxy, IContextChannel))
+            Console.WriteLine(proxy.Add(1234, 5434))
+            Console.WriteLine("All response properties:")
+            For Each prop In OperationContext.Current.IncomingMessageProperties
+                Console.WriteLine("{0}: {1}", prop.Key, prop.Value)
+            Next
+        End Using
+
+        Console.WriteLine("All nodes read in AfterReceiveReply:")
+        For Each node In allNodes
+            Console.WriteLine("  " + node)
+        Next
+        Console.WriteLine("Press ENTER to close")
+        Console.ReadLine()
+    End Sub
+End Class
+
+' http://stackoverflow.com/q/6186859/751090
+Public Class StackOverflow_6186859_751090
+
+    Public Class Declarations
+        Public Const SchemaVersion As String = "http://my.namespace"
+    End Class
+
+    'BinaryObjectType type 
+    '-------------------------------------------------- 
+    <XmlType(TypeName:="BinaryObjectType", Namespace:=Declarations.SchemaVersion), Serializable(), _
+     EditorBrowsable(EditorBrowsableState.Advanced)> _
+    Public Class BinaryObjectType
+        <XmlAttribute(AttributeName:="format", Form:=XmlSchemaForm.Unqualified, DataType:="string", Namespace:=Declarations.SchemaVersion), _
+             EditorBrowsable(EditorBrowsableState.Advanced)> _
+        Public __format As String
+        <XmlIgnore()> _
+        Public Property format() As String
+            Get
+                format = __format
+            End Get
+            Set(ByVal Value As String)
+                __format = Value
+            End Set
+        End Property
+
+        <XmlAttribute(AttributeName:="mimeCode", Form:=XmlSchemaForm.Unqualified, Namespace:=Declarations.SchemaVersion), _
+         EditorBrowsable(EditorBrowsableState.Advanced)> _
+        Public __mimeCode As String
+        <XmlIgnore()> _
+        Public Property mimeCode() As String
+            Get
+                mimeCode = __mimeCode
+            End Get
+            Set(ByVal Value As String)
+                __mimeCode = Value
+            End Set
+        End Property
+
+        <XmlText(DataType:="base64Binary"), _
+         EditorBrowsable(EditorBrowsableState.Advanced)> _
+        Public __Value As Byte()
+        <XmlIgnore()> _
+        Public Property Value() As Byte()
+            Get
+                Value = __Value
+            End Get
+            Set(ByVal val As Byte())
+                __Value = val
+            End Set
+        End Property
+
+    End Class
+
+    Public Shared Sub Test()
+        Dim ms As MemoryStream = New MemoryStream()
+        Dim ser As XmlSerializer = New XmlSerializer(GetType(BinaryObjectType))
+        Dim obj As BinaryObjectType = New BinaryObjectType()
+        obj.format = "PNG"
+        obj.mimeCode = "image/png"
+        obj.Value = Encoding.UTF8.GetBytes("Some random text which will be encoded as bytes")
+        ser.Serialize(ms, obj)
+        Console.WriteLine(Encoding.UTF8.GetString(ms.ToArray()))
+    End Sub
+End Class
 
 Public Class Post_2cf7cd17_c963_465b_a8ce_3edf5bd0467b
     <ServiceContract()> _
@@ -100,8 +482,8 @@ Public Class Post_2cf7cd17_c963_465b_a8ce_3edf5bd0467b
         Console.WriteLine("Press ENTER to close")
         Console.ReadLine()
 
-    'CType(proxy, IClientChannel).Close()
-    'factory.Close()
+        'CType(proxy, IClientChannel).Close()
+        'factory.Close()
         host.Close()
     End Sub
 
