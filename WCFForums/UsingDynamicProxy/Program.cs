@@ -1,19 +1,16 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.IdentityModel.Selectors;
+using System.IdentityModel.Tokens;
+using System.Net;
+using System.Net.Security;
+using System.Reflection;
+using System.Runtime.Serialization;
+using System.Security.Cryptography.X509Certificates;
 using System.ServiceModel;
 using System.ServiceModel.Channels;
 using System.ServiceModel.Description;
-using System.Net;
-using System.Security.Cryptography.X509Certificates;
-using System.Net.Security;
 using System.ServiceModel.Security;
-using System.IdentityModel.Selectors;
-using System.IdentityModel.Tokens;
 using WcfSamples.DynamicProxy;
-using System.Runtime.Serialization;
-using System.Reflection;
 
 namespace Post_4073aaa2_1ac9_427b_a0a7_dd0c68ee146c
 {
