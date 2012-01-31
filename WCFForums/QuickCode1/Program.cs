@@ -18785,11 +18785,388 @@ namespace QuickCode1
         }
     }
 
+    public class Post_317ed89f_19a7_4a10_a5c6_08f40e55dc48
+    {
+        [DataContract(Namespace = "")]
+        public class MyDC
+        {
+            [DataMember]
+            public string Name { get; set; }
+            [DataMember]
+            public int Age { get; set; }
+
+            public override string ToString()
+            {
+                return string.Format("MyDC[Name={0},Age={1}]", Name, Age);
+            }
+        }
+        [XmlType(Namespace = "")]
+        public class MyXmlType
+        {
+            public string Name { get; set; }
+            public int Age { get; set; }
+
+            public override string ToString()
+            {
+                return string.Format("MyXmlType[Name={0},Age={1}]", Name, Age);
+            }
+        }
+        [ServiceContract(Namespace = "")]
+        public interface ITest
+        {
+            [OperationContract, DataContractFormat]
+            void SendDCType(MyDC obj);
+            [OperationContract, XmlSerializerFormat]
+            void SendXmlType(MyXmlType obj);
+        }
+        public class Service : ITest
+        {
+            public void SendDCType(MyDC obj)
+            {
+                Console.WriteLine(obj);
+            }
+
+            public void SendXmlType(MyXmlType obj)
+            {
+                Console.WriteLine(obj);
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding(), "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            string dcRequestOrdered = @"<s:Envelope xmlns:s=""http://schemas.xmlsoap.org/soap/envelope/"">
+  <s:Body>
+    <SendDCType>
+      <obj>
+        <Age>33</Age>
+        <Name>John</Name>
+      </obj>
+    </SendDCType>
+  </s:Body>
+</s:Envelope>";
+            Console.WriteLine("DC request, ordered");
+            WebClient c = new WebClient();
+            c.Headers["SOAPAction"] = "urn:ITest/SendDCType";
+            c.Headers[HttpRequestHeader.ContentType] = "text/xml";
+            c.UploadString(baseAddress, dcRequestOrdered);
+            Console.WriteLine();
+
+            string dcRequestUnordered = @"<s:Envelope xmlns:s=""http://schemas.xmlsoap.org/soap/envelope/"">
+  <s:Body>
+    <SendDCType>
+      <obj>
+        <Name>John</Name>
+        <Age>33</Age>
+      </obj>
+    </SendDCType>
+  </s:Body>
+</s:Envelope>";
+            Console.WriteLine("DC request, NOT ordered");
+            c = new WebClient();
+            c.Headers["SOAPAction"] = "urn:ITest/SendDCType";
+            c.Headers[HttpRequestHeader.ContentType] = "text/xml";
+            c.UploadString(baseAddress, dcRequestUnordered);
+            Console.WriteLine();
+
+            string xsRequestOrdered = @"<s:Envelope xmlns:s=""http://schemas.xmlsoap.org/soap/envelope/"">
+  <s:Body>
+    <SendXmlType>
+      <obj>
+        <Name>John</Name>
+        <Age>33</Age>
+      </obj>
+    </SendXmlType>
+  </s:Body>
+</s:Envelope>";
+            Console.WriteLine("XmlSer request, ordered");
+            c = new WebClient();
+            c.Headers["SOAPAction"] = "urn:ITest/SendXmlType";
+            c.Headers[HttpRequestHeader.ContentType] = "text/xml";
+            c.UploadString(baseAddress, xsRequestOrdered);
+            Console.WriteLine();
+
+            string xsRequestUnordered = @"<s:Envelope xmlns:s=""http://schemas.xmlsoap.org/soap/envelope/"">
+  <s:Body>
+    <SendXmlType>
+      <obj>
+        <Age>33</Age>
+        <Name>John</Name>
+      </obj>
+    </SendXmlType>
+  </s:Body>
+</s:Envelope>";
+            Console.WriteLine("XmlSer request, NOT ordered");
+            c = new WebClient();
+            c.Headers["SOAPAction"] = "urn:ITest/SendXmlType";
+            c.Headers[HttpRequestHeader.ContentType] = "text/xml";
+            c.UploadString(baseAddress, xsRequestUnordered);
+            Console.WriteLine();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_51ca1ead_2f0a_4912_a451_374daab0101b
+    {
+        [DataContract(Name = "Person", Namespace = "")]
+        public class Person
+        {
+            string name;
+            int age;
+            bool nameWasSent;
+            bool ageWasSent;
+
+            [DataMember]
+            public string Name
+            {
+                get
+                {
+                    return this.name;
+                }
+
+                set
+                {
+                    this.nameWasSent = true;
+                    this.name = value;
+                }
+            }
+
+            [DataMember]
+            public int Age
+            {
+                get
+                {
+                    return this.age;
+                }
+
+                set
+                {
+                    this.ageWasSent = true;
+                    this.age = value;
+                }
+            }
+
+            [OnDeserializing]
+            void OnDeserializing(StreamingContext ctx)
+            {
+                this.ageWasSent = false;
+                this.nameWasSent = false;
+            }
+
+            public override string ToString()
+            {
+                return string.Format("Person[Name={0},Age={1}]",
+                    nameWasSent ? name : "UNSPECIFIED",
+                    ageWasSent ? age.ToString() : "UNSPECIFIED");
+            }
+        }
+
+        public static void Test()
+        {
+            MemoryStream ms = new MemoryStream();
+            DataContractSerializer dcs = new DataContractSerializer(typeof(Person));
+            dcs.WriteObject(ms, new Person { Name = "John", Age = 30 });
+            Console.WriteLine(Encoding.UTF8.GetString(ms.ToArray()));
+
+            string noAge = "<Person><Name>John</Name></Person>";
+            ms = new MemoryStream(Encoding.UTF8.GetBytes(noAge));
+            object p = dcs.ReadObject(ms);
+            Console.WriteLine("No age: {0}", p);
+
+            string noName = "<Person><Age>45</Age></Person>";
+            ms = new MemoryStream(Encoding.UTF8.GetBytes(noName));
+            p = dcs.ReadObject(ms);
+            Console.WriteLine("No name: {0}", p);
+        }
+    }
+
+    public class Post_835dec2e_155c_4562_b50d_574e4fefea36
+    {
+        [ServiceContract]
+        public class Service
+        {
+            [WebGet(UriTemplate = "Query?query={Query}", ResponseFormat = WebMessageFormat.Json)]
+            public QueryResponse Query(InputQuery Query)
+            {
+                return new QueryResponse
+                {
+                    Text = Query.ToQueryString(),
+                };
+            }
+        }
+
+        [DataContract]
+        public class QueryResponse
+        {
+            [DataMember]
+            public string Text;
+        }
+
+        [DataContract]
+        public class InputQuery
+        {
+            [DataMember]
+            public int StartAt { get; set; }
+            [DataMember]
+            public int Count { get; set; }
+            [DataMember]
+            public string Language { get; set; }
+            [DataMember]
+            public string Engine { get; set; }
+            [DataMember]
+            public IList<String> ContentSourceString { get; set; }
+            [DataMember]
+            public string FreeFormString { get; set; }
+            [DataMember]
+            public IList<Filter> Filters { get; set; }
+
+            static readonly Regex regex = new Regex(@"(?<startat>\d+)\|" +
+                @"(?<count>\d+)\|" +
+                @"(?<language>[^|]+)\|" +
+                @"(?<engine>[^|]+)\|" +
+                @"(?<contentsourcestring>[^|]+)\|" +
+                @"(?<freeformstring>[^|]+)\|" +
+                @"(?<filters>[^|]+)");
+
+            public string ToQueryString()
+            {
+                StringBuilder sb = new StringBuilder();
+                sb.Append(StartAt);
+                sb.Append("|");
+                sb.Append(Count);
+                sb.Append("|");
+                sb.Append(Language);
+                sb.Append("|");
+                sb.Append(Engine);
+                sb.Append("|");
+                sb.Append(string.Join(",", ContentSourceString));
+                sb.Append("|");
+                sb.Append(FreeFormString);
+                sb.Append("|");
+                sb.Append(string.Join(",", Filters.Select(x => x.ToQueryString())));
+                return sb.ToString();
+            }
+
+            public static InputQuery FromQueryString(string queryString)
+            {
+                Match match = regex.Match(queryString);
+                InputQuery result = new InputQuery
+                {
+                    StartAt = int.Parse(match.Groups["startat"].Value),
+                    Count = int.Parse(match.Groups["count"].Value),
+                    Language = match.Groups["language"].Value,
+                    Engine = match.Groups["engine"].Value,
+                    ContentSourceString = new List<string>(match.Groups["contentsourcestring"].Value.Split(',')),
+                    FreeFormString = match.Groups["freeformstring"].Value,
+                    Filters = new List<Filter>(match.Groups["filters"].Value.Split(',').Select(x => Filter.FromQueryString(x))),
+                };
+
+                return result;
+            }
+        }
+
+        [DataContract]
+        public class Filter
+        {
+            [DataMember]
+            public string FilterString { get; set; }
+            [DataMember]
+            public string Operator { get; set; }
+
+            public string ToQueryString()
+            {
+                return string.Format("Filter-{0}-{1}", FilterString, Operator);
+            }
+
+            public static Filter FromQueryString(string queryString)
+            {
+                Regex regex = new Regex(@"Filter\-([^\-]+)\-([^\-]+)");
+                Match match = regex.Match(queryString);
+                return new Filter { FilterString = match.Groups[1].Value, Operator = match.Groups[2].Value };
+            }
+        }
+
+        public class MyQueryStringConverter : QueryStringConverter
+        {
+            public override bool CanConvert(Type type)
+            {
+                return base.CanConvert(type) || type == typeof(InputQuery);
+            }
+
+            public override object ConvertStringToValue(string parameter, Type parameterType)
+            {
+                if (parameterType == typeof(InputQuery))
+                {
+                    return InputQuery.FromQueryString(parameter);
+                }
+                else
+                {
+                    return base.ConvertStringToValue(parameter, parameterType);
+                }
+            }
+        }
+
+        public class MyWebHttpBehavior : WebHttpBehavior
+        {
+            protected override QueryStringConverter GetQueryStringConverter(OperationDescription operationDescription)
+            {
+                if (operationDescription.Messages[0].Body.Parts.Count == 1 &&
+                    operationDescription.Messages[0].Body.Parts[0].Type == typeof(InputQuery))
+                {
+                    return new MyQueryStringConverter();
+                }
+                else
+                {
+                    return base.GetQueryStringConverter(operationDescription);
+                }
+            }
+        }
+
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            ServiceEndpoint endpoint = host.AddServiceEndpoint(typeof(Service), new WebHttpBinding(), "");
+            endpoint.Behaviors.Add(new MyWebHttpBehavior());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            InputQuery input = new InputQuery
+            {
+                ContentSourceString = new List<string> { "contentSource1", "contentSource2" },
+                Count = 100,
+                Engine = "engine",
+                Filters = new List<Filter>
+                {
+                    new Filter { FilterString = "str1", Operator = "op1" },
+                    new Filter { FilterString = "str2", Operator = "op2" },
+                },
+                FreeFormString = "freeFormString",
+                Language = "language",
+                StartAt = 20,
+            };
+
+            WebClient client = new WebClient();
+            Console.WriteLine(client.DownloadString(baseAddress + "/Query?query=" + input.ToQueryString()));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            Post_9144d4a8_f12c_4e27_a64d_7ea9092b3300.Test();
+            Post_835dec2e_155c_4562_b50d_574e4fefea36.Test();
         }
     }
 }

@@ -497,10 +497,169 @@ Public Class Post_5098d8ba_e6d1_4c63_8b72_7147c591b6d1
 
 End Class
 
+Public Class Post_4c22e180_cebd_4a5b_9d9f_5055469a7d94
+
+    Class MyEncodingBindingElement
+        Inherits MessageEncodingBindingElement
+
+        Private inner As MessageEncodingBindingElement
+
+        Public Sub New(ByRef inner As MessageEncodingBindingElement)
+            Me.inner = inner
+        End Sub
+
+        Public Overrides Function Clone() As BindingElement
+            Return New MyEncodingBindingElement(CType(Me.inner.Clone, MessageEncodingBindingElement))
+        End Function
+
+        Public Overrides Function CreateMessageEncoderFactory() As MessageEncoderFactory
+            Return New MyEncoderFactory(Me.inner.CreateMessageEncoderFactory())
+        End Function
+
+        Public Overrides Property MessageVersion As MessageVersion
+            Get
+                Return Me.inner.MessageVersion
+            End Get
+            Set(value As MessageVersion)
+                Me.inner.MessageVersion = value
+            End Set
+        End Property
+
+        Public Overrides Function CanBuildChannelFactory(Of TChannel)(context As BindingContext) As Boolean
+            Return context.CanBuildInnerChannelFactory(Of TChannel)()
+        End Function
+
+        Public Overrides Function BuildChannelFactory(Of TChannel)(context As BindingContext) As IChannelFactory(Of TChannel)
+            context.BindingParameters.Add(Me)
+            Return context.BuildInnerChannelFactory(Of TChannel)()
+        End Function
+    End Class
+
+    Class MyEncoderFactory
+        Inherits MessageEncoderFactory
+
+        Private inner As MessageEncoderFactory
+
+        Sub New(inner As MessageEncoderFactory)
+            Me.inner = inner
+        End Sub
+
+        Public Overrides ReadOnly Property Encoder As MessageEncoder
+            Get
+                Return New MyEncoder(Me.inner.Encoder)
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property MessageVersion As MessageVersion
+            Get
+                Return Me.inner.MessageVersion
+            End Get
+        End Property
+    End Class
+
+    Class MyEncoder
+        Inherits MessageEncoder
+
+        Private inner As MessageEncoder
+
+        Sub New(inner As MessageEncoder)
+            Me.inner = inner
+        End Sub
+
+        Public Overrides ReadOnly Property ContentType As String
+            Get
+                Return Me.inner.ContentType
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property MediaType As String
+            Get
+                Return Me.inner.MediaType
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property MessageVersion As MessageVersion
+            Get
+                Return Me.inner.MessageVersion
+            End Get
+        End Property
+
+        Public Overrides Function IsContentTypeSupported(contentType As String) As Boolean
+            Return Me.inner.IsContentTypeSupported(contentType) Or contentType = "text/xml; charset=ISO-8859-1"
+        End Function
+
+        Public Overloads Overrides Function ReadMessage(buffer As ArraySegment(Of Byte), bufferManager As BufferManager, contentType As String) As Message
+            If contentType = "text/xml; charset=ISO-8859-1" Then
+                Dim msgContents As Byte()
+                msgContents = New Byte(buffer.Count - 1) {}
+                Array.Copy(buffer.Array, buffer.Offset, msgContents, 0, buffer.Count)
+                bufferManager.ReturnBuffer(buffer.Array)
+                Return Me.ReadMessage(New MemoryStream(msgContents), Integer.MaxValue, contentType)
+            Else
+                Return Me.inner.ReadMessage(buffer, bufferManager, contentType)
+            End If
+        End Function
+
+        Public Overloads Overrides Function ReadMessage(stream As Stream, maxSizeOfHeaders As Integer, contentType As String) As Message
+            Dim reader As XmlReader
+            reader = XmlReader.Create(stream)
+            Return Message.CreateMessage(reader, maxSizeOfHeaders, Me.MessageVersion)
+        End Function
+
+        Public Overloads Overrides Function WriteMessage(message As Message, maxMessageSize As Integer, bufferManager As BufferManager, messageOffset As Integer) As ArraySegment(Of Byte)
+            Return Me.inner.WriteMessage(message, maxMessageSize, bufferManager, messageOffset)
+        End Function
+
+        Public Overloads Overrides Sub WriteMessage(message As Message, stream As Stream)
+            Me.inner.WriteMessage(message, stream)
+        End Sub
+    End Class
+
+    Public Shared Sub Test()
+        Dim noaa_service As New ReferencePost_4c22e180_cebd_4a5b_9d9f_5055469a7d94.ndfdXMLPortTypeClient
+
+        Dim customBinding As CustomBinding
+        customBinding = New CustomBinding(noaa_service.Endpoint.Binding)
+        Dim i
+        For i = 0 To customBinding.Elements.Count - 1
+            Dim mebe As MessageEncodingBindingElement
+            mebe = TryCast(customBinding.Elements(i), MessageEncodingBindingElement)
+            If mebe IsNot Nothing Then
+                customBinding.Elements(i) = New MyEncodingBindingElement(CType(customBinding.Elements(i), MessageEncodingBindingElement))
+                Exit For
+            End If
+        Next
+        noaa_service.Endpoint.Binding = customBinding
+
+        Dim noaa_weather_type As New ReferencePost_4c22e180_cebd_4a5b_9d9f_5055469a7d94.weatherParametersType
+
+        noaa_weather_type.tstmprb = True
+        noaa_weather_type.wdir = True
+        noaa_weather_type.wdir_r = True
+        noaa_weather_type.tmpabv14d = True
+
+        noaa_service.Open()
+        Try
+            Dim s As String = noaa_service.NDFDgen(CDec(45.0), _
+                                                   -105, _
+                                                   ReferencePost_4c22e180_cebd_4a5b_9d9f_5055469a7d94.productType.timeseries, _
+                                                   Date.Now, _
+                                                   Date.Now.AddDays(7), _
+                                                   ReferencePost_4c22e180_cebd_4a5b_9d9f_5055469a7d94.unitType.e, _
+                                                   noaa_weather_type)
+            Console.WriteLine(s)
+        Catch ex As Exception
+            Console.WriteLine(ex)
+        End Try
+    End Sub
+
+End Class
+
+
 Module Module1
 
     Sub Main()
-        Post_5098d8ba_e6d1_4c63_8b72_7147c591b6d1.Test()
+        Post_4c22e180_cebd_4a5b_9d9f_5055469a7d94.Test()
     End Sub
 
 End Module
