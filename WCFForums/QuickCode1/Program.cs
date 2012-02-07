@@ -19162,11 +19162,261 @@ namespace QuickCode1
         }
     }
 
+    public class Post_6d425909_c10d_4696_a5db_876077097e5f
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string Echo(string text);
+        }
+        public class Service : ITest
+        {
+            public string Echo(string text)
+            {
+                return text;
+            }
+        }
+        static Binding GetBinding()
+        {
+            var result = new BasicHttpBinding(BasicHttpSecurityMode.None);
+            return result;
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), GetBinding(), "");
+            host.Description.Behaviors.Add(new ServiceMetadataBehavior { HttpGetEnabled = true });
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(GetBinding(), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+            Console.WriteLine(proxy.Echo("Hello"));
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_ca54a5fa_8336_4555_b474_03c90832810c
+    {
+        public class Item
+        {
+            public string Id { get; set; }
+            public string Value { get; set; }
+        }
+        public class UseListItemFormatterAttribute : Attribute, IOperationBehavior
+        {
+            public void AddBindingParameters(OperationDescription operationDescription, BindingParameterCollection bindingParameters)
+            {
+            }
+
+            public void ApplyClientBehavior(OperationDescription operationDescription, ClientOperation clientOperation)
+            {
+            }
+
+            public void ApplyDispatchBehavior(OperationDescription operationDescription, DispatchOperation dispatchOperation)
+            {
+            }
+
+            public void Validate(OperationDescription operationDescription)
+            {
+            }
+        }
+        [ServiceContract]
+        public class Service
+        {
+            [WebInvoke(UriTemplate = "/putItems/*")]
+            [UseListItemFormatter]
+            public string putItems(List<Item> items)
+            {
+                Console.WriteLine("In server (PutItems), items.Count = {0}", items.Count);
+                foreach (var item in items)
+                {
+                    Console.WriteLine("  item: {0}={1}", item.Id, item.Value);
+                }
+
+                return null;
+            }
+
+            [WebGet(UriTemplate = "/getItems/*")]
+            [UseListItemFormatter]
+            public string getItems(List<Item> items)
+            {
+                Console.WriteLine("In server (GetItems), items.Count = {0}", items.Count);
+                foreach (var item in items)
+                {
+                    Console.WriteLine("  item: {0}={1}", item.Id, item.Value);
+                }
+
+                return null;
+            }
+        }
+        class MyWebHttpBehavior : WebHttpBehavior
+        {
+            protected override IDispatchMessageFormatter GetRequestDispatchFormatter(OperationDescription operationDescription, ServiceEndpoint endpoint)
+            {
+                if (operationDescription.Behaviors.Find<UseListItemFormatterAttribute>() != null)
+                {
+                    return new MyFormatter(operationDescription, endpoint.Address.Uri);
+                }
+                else
+                {
+                    return base.GetRequestDispatchFormatter(operationDescription, endpoint);
+                }
+            }
+        }
+        class MyFormatter : IDispatchMessageFormatter
+        {
+            private OperationDescription operationDescription;
+            Uri endpointAddress;
+
+            public MyFormatter(OperationDescription operationDescription, Uri endpointAddress)
+            {
+                if (operationDescription.Messages[0].Body.Parts.Count != 1 ||
+                    operationDescription.Messages[0].Body.Parts[0].Type != typeof(List<Item>))
+                {
+                    throw new InvalidOperationException("This formatter can only be used in operations which take a single List<Item> parameter");
+                }
+
+                this.operationDescription = operationDescription;
+                this.endpointAddress = endpointAddress;
+            }
+
+            public void DeserializeRequest(Message message, object[] parameters)
+            {
+                string endpointAddressPath = this.endpointAddress.AbsolutePath;
+                string requestPath = message.Headers.To.AbsolutePath;
+                string afterRequest = requestPath.Substring(endpointAddressPath.Length);
+                string uriTemplate = this.GetUriTemplate();
+                if (afterRequest.StartsWith("/")) afterRequest = afterRequest.Substring(1);
+                if (uriTemplate.StartsWith("/")) uriTemplate = uriTemplate.Substring(1);
+                if (uriTemplate.EndsWith("*")) uriTemplate = uriTemplate.Substring(0, uriTemplate.Length - 1);
+                if (afterRequest.StartsWith(uriTemplate)) afterRequest = afterRequest.Substring(uriTemplate.Length);
+                List<Item> list = new List<Item>();
+                parameters[0] = list;
+                string[] items = afterRequest.Split('/');
+                for (int i = 0; i < items.Length - 1; i += 2)
+                {
+                    list.Add(new Item { Id = items[i], Value = items[i + 1] });
+                }
+            }
+
+            public Message SerializeReply(MessageVersion messageVersion, object[] parameters, object result)
+            {
+                throw new NotSupportedException("This is a Request-only formatter");
+            }
+
+            private string GetUriTemplate()
+            {
+                WebGetAttribute wga = this.operationDescription.Behaviors.Find<WebGetAttribute>();
+                if (wga != null)
+                {
+                    return wga.UriTemplate;
+                }
+                else
+                {
+                    return this.operationDescription.Behaviors.Find<WebInvokeAttribute>().UriTemplate;
+                }
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(Service), new WebHttpBinding(), "").Behaviors.Add(new MyWebHttpBehavior());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            Util.SendRequest(baseAddress + "/putItems/item1/value1/item2/value2/item3/value3", "POST", "application/json", "");
+            Util.SendRequest(baseAddress + "/getItems", "GET", null, null);
+            Util.SendRequest(baseAddress + "/getItems/i1/v1/i2/v2", "GET", null, null);
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/9135439/751090
+    public class StackOverflow_9135439
+    {
+        const string JSON = @"{
+    ""summary"":{
+        ""pricing"":{
+            ""net"":988,
+            ""tax"":13,
+            ""gross"":729
+        },
+        ""status"":{
+            ""runningfor"":29881175,
+            ""stoppedfor"":88805,
+            ""idlefor"":1298331744
+        }
+    }
+}";
+        [DataContractAttribute(Name = "status")]
+        public class Status
+        {
+            [DataMember(Name = "runningfor")]
+            public int RunningFor { get; set; }
+            [DataMember(Name = "stoppedfor")]
+            public int StoppedFor { get; set; }
+            [DataMember(Name = "idlefor")]
+            public int IdleFor { get; set; }
+        }
+
+        [DataContract]
+        public class Summary
+        {
+            [DataMember(Name = "status")]
+            public Status Status { get; set; }
+
+            // add "pricing" later if you need
+        }
+
+        [DataContract]
+        public class Response
+        {
+            [DataMember(Name = "summary")]
+            public Summary Summary { get; set; }
+        }
+
+        public class JSONHelper
+        {
+            /// <summary>
+            /// JSON Deserialization
+            /// </summary>
+            public static T JsonDeserialize<T>(string jsonString)
+            {
+                T obj = Activator.CreateInstance<T>();
+                MemoryStream ms = new MemoryStream(Encoding.Unicode.GetBytes(jsonString));
+                DataContractJsonSerializer serializer = new DataContractJsonSerializer(obj.GetType());
+                obj = (T)serializer.ReadObject(ms);
+                ms.Close();
+                return obj;
+            }
+        }
+
+        public static void Test()
+        {
+            Response resp = JSONHelper.JsonDeserialize<Response>(JSON);
+            Console.WriteLine(resp.Summary.Status.RunningFor);
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            Post_835dec2e_155c_4562_b50d_574e4fefea36.Test();
+            StackOverflow_9135439.Test();
         }
     }
 }
