@@ -19349,19 +19349,19 @@ namespace QuickCode1
     public class StackOverflow_9135439
     {
         const string JSON = @"{
-    ""summary"":{
-        ""pricing"":{
-            ""net"":988,
-            ""tax"":13,
-            ""gross"":729
-        },
-        ""status"":{
-            ""runningfor"":29881175,
-            ""stoppedfor"":88805,
-            ""idlefor"":1298331744
+        ""summary"":{
+            ""pricing"":{
+                ""net"":988,
+                ""tax"":13,
+                ""gross"":729
+            },
+            ""status"":{
+                ""runningfor"":29881175,
+                ""stoppedfor"":88805,
+                ""idlefor"":1298331744
+            }
         }
-    }
-}";
+    }";
         [DataContractAttribute(Name = "status")]
         public class Status
         {
@@ -19412,11 +19412,120 @@ namespace QuickCode1
         }
     }
 
+    public class StackOverflow_9231493
+    {
+        public class Wrapper : IComparable<Wrapper>
+        {
+            internal string value;
+            private double? dbl;
+
+            public Wrapper(string value)
+            {
+                if (value == null) throw new ArgumentNullException("value");
+                this.value = value;
+                double temp;
+                if (double.TryParse(value, out temp))
+                {
+                    dbl = temp;
+                }
+            }
+
+            public int CompareTo(Wrapper other)
+            {
+                if (other == null) return -1;
+                if (this.dbl.HasValue != other.dbl.HasValue)
+                {
+                    return other.dbl.HasValue ? -1 : 1;
+                }
+                else if (!this.dbl.HasValue)
+                {
+                    return this.value.CompareTo(other.value);
+                }
+                else
+                {
+                    return Math.Sign(this.dbl.Value - other.dbl.Value);
+                }
+            }
+        }
+        public static void Test()
+        {
+            List<string> list = new List<string>
+            {
+                "cat",
+                 "4",
+                 "5.4",
+                 "dog",
+                 "-400",
+                 "aardvark",
+                 "12.23.34.54",
+                 "i am a sentence",
+                 "0" ,
+            };
+
+            List<Wrapper> list2 = list.Select(x => new Wrapper(x)).ToList();
+            list2.Sort();
+            Console.WriteLine(string.Join("\n", list2.Select(w => w.value)));
+        }
+    }
+
+    public class Post_270f2713_4b4e_47cf_891b_233cea4c5e8e
+    {
+        [ServiceContract]
+        public class MobileServices
+        {
+            [WebGet]
+            public string DoSomething()
+            {
+                return "Hello";
+            }
+
+            [WebGet]
+            public Stream GetEndpoints()
+            {
+                StringBuilder sb = new StringBuilder();
+                foreach (var ep in OperationContext.Current.Host.Description.Endpoints)
+                {
+                    sb.AppendLine("Endpoint: " + ep.Name);
+                    sb.AppendLine("  Address: " + ep.Address.Uri);
+                    sb.AppendLine("  Binding (scheme): " + ep.Binding.Scheme);
+                    sb.AppendLine("  Contract: " + ep.Contract.Name);
+                }
+
+                WebOperationContext.Current.OutgoingResponse.ContentType = "text/plain";
+                return new MemoryStream(Encoding.UTF8.GetBytes(sb.ToString()));
+            }
+        }
+        public class MyFactory : ServiceHostFactory
+        {
+            protected override ServiceHost CreateServiceHost(Type serviceType, Uri[] baseAddresses)
+            {
+                ServiceHost host = new ServiceHost(serviceType, baseAddresses);
+                foreach (Uri baseAddress in baseAddresses)
+                {
+                    WebHttpBinding binding;
+                    if (baseAddress.Scheme == Uri.UriSchemeHttps)
+                    {
+                        binding = new WebHttpBinding(WebHttpSecurityMode.Transport);
+                    }
+                    else
+                    {
+                        binding = new WebHttpBinding();
+                    }
+
+                    ServiceEndpoint endpoint = host.AddServiceEndpoint(typeof(MobileServices), binding, "");
+                    endpoint.Behaviors.Add(new WebHttpBehavior());
+                }
+
+                return host;
+            }
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_9135439.Test();
+            Post_270f2713_4b4e_47cf_891b_233cea4c5e8e.Test();
         }
     }
 }
