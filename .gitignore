@@ -13,6 +13,12 @@
 *.csproj.user
 bin/
 obj/
+Debug/
+
+# C++ helper files #
+#######################
+*.sdf
+*.opensdf
 
 # Nuget #
 #########

@@ -94,6 +94,11 @@
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
+    <Compile Include="Service References\ReferencePost_4c22e180_cebd_4a5b_9d9f_5055469a7d94\Reference.vb">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
     <Compile Include="Template.vb" />
   </ItemGroup>
   <ItemGroup>
@@ -114,6 +119,25 @@
       <Generator>SettingsSingleFileGenerator</Generator>
       <CustomToolNamespace>My</CustomToolNamespace>
       <LastGenOutput>Settings.Designer.vb</LastGenOutput>
+    </None>
+    <None Include="Service References\ReferencePost_4c22e180_cebd_4a5b_9d9f_5055469a7d94\ndfdXML.wsdl" />
+  </ItemGroup>
+  <ItemGroup>
+    <WCFMetadata Include="Service References\" />
+  </ItemGroup>
+  <ItemGroup>
+    <WCFMetadataStorage Include="Service References\ReferencePost_4c22e180_cebd_4a5b_9d9f_5055469a7d94\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ReferencePost_4c22e180_cebd_4a5b_9d9f_5055469a7d94\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ReferencePost_4c22e180_cebd_4a5b_9d9f_5055469a7d94\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ReferencePost_4c22e180_cebd_4a5b_9d9f_5055469a7d94\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.vb</LastGenOutput>
     </None>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />

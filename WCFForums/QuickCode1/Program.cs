@@ -18785,11 +18785,747 @@ namespace QuickCode1
         }
     }
 
+    public class Post_317ed89f_19a7_4a10_a5c6_08f40e55dc48
+    {
+        [DataContract(Namespace = "")]
+        public class MyDC
+        {
+            [DataMember]
+            public string Name { get; set; }
+            [DataMember]
+            public int Age { get; set; }
+
+            public override string ToString()
+            {
+                return string.Format("MyDC[Name={0},Age={1}]", Name, Age);
+            }
+        }
+        [XmlType(Namespace = "")]
+        public class MyXmlType
+        {
+            public string Name { get; set; }
+            public int Age { get; set; }
+
+            public override string ToString()
+            {
+                return string.Format("MyXmlType[Name={0},Age={1}]", Name, Age);
+            }
+        }
+        [ServiceContract(Namespace = "")]
+        public interface ITest
+        {
+            [OperationContract, DataContractFormat]
+            void SendDCType(MyDC obj);
+            [OperationContract, XmlSerializerFormat]
+            void SendXmlType(MyXmlType obj);
+        }
+        public class Service : ITest
+        {
+            public void SendDCType(MyDC obj)
+            {
+                Console.WriteLine(obj);
+            }
+
+            public void SendXmlType(MyXmlType obj)
+            {
+                Console.WriteLine(obj);
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding(), "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            string dcRequestOrdered = @"<s:Envelope xmlns:s=""http://schemas.xmlsoap.org/soap/envelope/"">
+  <s:Body>
+    <SendDCType>
+      <obj>
+        <Age>33</Age>
+        <Name>John</Name>
+      </obj>
+    </SendDCType>
+  </s:Body>
+</s:Envelope>";
+            Console.WriteLine("DC request, ordered");
+            WebClient c = new WebClient();
+            c.Headers["SOAPAction"] = "urn:ITest/SendDCType";
+            c.Headers[HttpRequestHeader.ContentType] = "text/xml";
+            c.UploadString(baseAddress, dcRequestOrdered);
+            Console.WriteLine();
+
+            string dcRequestUnordered = @"<s:Envelope xmlns:s=""http://schemas.xmlsoap.org/soap/envelope/"">
+  <s:Body>
+    <SendDCType>
+      <obj>
+        <Name>John</Name>
+        <Age>33</Age>
+      </obj>
+    </SendDCType>
+  </s:Body>
+</s:Envelope>";
+            Console.WriteLine("DC request, NOT ordered");
+            c = new WebClient();
+            c.Headers["SOAPAction"] = "urn:ITest/SendDCType";
+            c.Headers[HttpRequestHeader.ContentType] = "text/xml";
+            c.UploadString(baseAddress, dcRequestUnordered);
+            Console.WriteLine();
+
+            string xsRequestOrdered = @"<s:Envelope xmlns:s=""http://schemas.xmlsoap.org/soap/envelope/"">
+  <s:Body>
+    <SendXmlType>
+      <obj>
+        <Name>John</Name>
+        <Age>33</Age>
+      </obj>
+    </SendXmlType>
+  </s:Body>
+</s:Envelope>";
+            Console.WriteLine("XmlSer request, ordered");
+            c = new WebClient();
+            c.Headers["SOAPAction"] = "urn:ITest/SendXmlType";
+            c.Headers[HttpRequestHeader.ContentType] = "text/xml";
+            c.UploadString(baseAddress, xsRequestOrdered);
+            Console.WriteLine();
+
+            string xsRequestUnordered = @"<s:Envelope xmlns:s=""http://schemas.xmlsoap.org/soap/envelope/"">
+  <s:Body>
+    <SendXmlType>
+      <obj>
+        <Age>33</Age>
+        <Name>John</Name>
+      </obj>
+    </SendXmlType>
+  </s:Body>
+</s:Envelope>";
+            Console.WriteLine("XmlSer request, NOT ordered");
+            c = new WebClient();
+            c.Headers["SOAPAction"] = "urn:ITest/SendXmlType";
+            c.Headers[HttpRequestHeader.ContentType] = "text/xml";
+            c.UploadString(baseAddress, xsRequestUnordered);
+            Console.WriteLine();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_51ca1ead_2f0a_4912_a451_374daab0101b
+    {
+        [DataContract(Name = "Person", Namespace = "")]
+        public class Person
+        {
+            string name;
+            int age;
+            bool nameWasSent;
+            bool ageWasSent;
+
+            [DataMember]
+            public string Name
+            {
+                get
+                {
+                    return this.name;
+                }
+
+                set
+                {
+                    this.nameWasSent = true;
+                    this.name = value;
+                }
+            }
+
+            [DataMember]
+            public int Age
+            {
+                get
+                {
+                    return this.age;
+                }
+
+                set
+                {
+                    this.ageWasSent = true;
+                    this.age = value;
+                }
+            }
+
+            [OnDeserializing]
+            void OnDeserializing(StreamingContext ctx)
+            {
+                this.ageWasSent = false;
+                this.nameWasSent = false;
+            }
+
+            public override string ToString()
+            {
+                return string.Format("Person[Name={0},Age={1}]",
+                    nameWasSent ? name : "UNSPECIFIED",
+                    ageWasSent ? age.ToString() : "UNSPECIFIED");
+            }
+        }
+
+        public static void Test()
+        {
+            MemoryStream ms = new MemoryStream();
+            DataContractSerializer dcs = new DataContractSerializer(typeof(Person));
+            dcs.WriteObject(ms, new Person { Name = "John", Age = 30 });
+            Console.WriteLine(Encoding.UTF8.GetString(ms.ToArray()));
+
+            string noAge = "<Person><Name>John</Name></Person>";
+            ms = new MemoryStream(Encoding.UTF8.GetBytes(noAge));
+            object p = dcs.ReadObject(ms);
+            Console.WriteLine("No age: {0}", p);
+
+            string noName = "<Person><Age>45</Age></Person>";
+            ms = new MemoryStream(Encoding.UTF8.GetBytes(noName));
+            p = dcs.ReadObject(ms);
+            Console.WriteLine("No name: {0}", p);
+        }
+    }
+
+    public class Post_835dec2e_155c_4562_b50d_574e4fefea36
+    {
+        [ServiceContract]
+        public class Service
+        {
+            [WebGet(UriTemplate = "Query?query={Query}", ResponseFormat = WebMessageFormat.Json)]
+            public QueryResponse Query(InputQuery Query)
+            {
+                return new QueryResponse
+                {
+                    Text = Query.ToQueryString(),
+                };
+            }
+        }
+
+        [DataContract]
+        public class QueryResponse
+        {
+            [DataMember]
+            public string Text;
+        }
+
+        [DataContract]
+        public class InputQuery
+        {
+            [DataMember]
+            public int StartAt { get; set; }
+            [DataMember]
+            public int Count { get; set; }
+            [DataMember]
+            public string Language { get; set; }
+            [DataMember]
+            public string Engine { get; set; }
+            [DataMember]
+            public IList<String> ContentSourceString { get; set; }
+            [DataMember]
+            public string FreeFormString { get; set; }
+            [DataMember]
+            public IList<Filter> Filters { get; set; }
+
+            static readonly Regex regex = new Regex(@"(?<startat>\d+)\|" +
+                @"(?<count>\d+)\|" +
+                @"(?<language>[^|]+)\|" +
+                @"(?<engine>[^|]+)\|" +
+                @"(?<contentsourcestring>[^|]+)\|" +
+                @"(?<freeformstring>[^|]+)\|" +
+                @"(?<filters>[^|]+)");
+
+            public string ToQueryString()
+            {
+                StringBuilder sb = new StringBuilder();
+                sb.Append(StartAt);
+                sb.Append("|");
+                sb.Append(Count);
+                sb.Append("|");
+                sb.Append(Language);
+                sb.Append("|");
+                sb.Append(Engine);
+                sb.Append("|");
+                sb.Append(string.Join(",", ContentSourceString));
+                sb.Append("|");
+                sb.Append(FreeFormString);
+                sb.Append("|");
+                sb.Append(string.Join(",", Filters.Select(x => x.ToQueryString())));
+                return sb.ToString();
+            }
+
+            public static InputQuery FromQueryString(string queryString)
+            {
+                Match match = regex.Match(queryString);
+                InputQuery result = new InputQuery
+                {
+                    StartAt = int.Parse(match.Groups["startat"].Value),
+                    Count = int.Parse(match.Groups["count"].Value),
+                    Language = match.Groups["language"].Value,
+                    Engine = match.Groups["engine"].Value,
+                    ContentSourceString = new List<string>(match.Groups["contentsourcestring"].Value.Split(',')),
+                    FreeFormString = match.Groups["freeformstring"].Value,
+                    Filters = new List<Filter>(match.Groups["filters"].Value.Split(',').Select(x => Filter.FromQueryString(x))),
+                };
+
+                return result;
+            }
+        }
+
+        [DataContract]
+        public class Filter
+        {
+            [DataMember]
+            public string FilterString { get; set; }
+            [DataMember]
+            public string Operator { get; set; }
+
+            public string ToQueryString()
+            {
+                return string.Format("Filter-{0}-{1}", FilterString, Operator);
+            }
+
+            public static Filter FromQueryString(string queryString)
+            {
+                Regex regex = new Regex(@"Filter\-([^\-]+)\-([^\-]+)");
+                Match match = regex.Match(queryString);
+                return new Filter { FilterString = match.Groups[1].Value, Operator = match.Groups[2].Value };
+            }
+        }
+
+        public class MyQueryStringConverter : QueryStringConverter
+        {
+            public override bool CanConvert(Type type)
+            {
+                return base.CanConvert(type) || type == typeof(InputQuery);
+            }
+
+            public override object ConvertStringToValue(string parameter, Type parameterType)
+            {
+                if (parameterType == typeof(InputQuery))
+                {
+                    return InputQuery.FromQueryString(parameter);
+                }
+                else
+                {
+                    return base.ConvertStringToValue(parameter, parameterType);
+                }
+            }
+        }
+
+        public class MyWebHttpBehavior : WebHttpBehavior
+        {
+            protected override QueryStringConverter GetQueryStringConverter(OperationDescription operationDescription)
+            {
+                if (operationDescription.Messages[0].Body.Parts.Count == 1 &&
+                    operationDescription.Messages[0].Body.Parts[0].Type == typeof(InputQuery))
+                {
+                    return new MyQueryStringConverter();
+                }
+                else
+                {
+                    return base.GetQueryStringConverter(operationDescription);
+                }
+            }
+        }
+
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            ServiceEndpoint endpoint = host.AddServiceEndpoint(typeof(Service), new WebHttpBinding(), "");
+            endpoint.Behaviors.Add(new MyWebHttpBehavior());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            InputQuery input = new InputQuery
+            {
+                ContentSourceString = new List<string> { "contentSource1", "contentSource2" },
+                Count = 100,
+                Engine = "engine",
+                Filters = new List<Filter>
+                {
+                    new Filter { FilterString = "str1", Operator = "op1" },
+                    new Filter { FilterString = "str2", Operator = "op2" },
+                },
+                FreeFormString = "freeFormString",
+                Language = "language",
+                StartAt = 20,
+            };
+
+            WebClient client = new WebClient();
+            Console.WriteLine(client.DownloadString(baseAddress + "/Query?query=" + input.ToQueryString()));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_6d425909_c10d_4696_a5db_876077097e5f
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string Echo(string text);
+        }
+        public class Service : ITest
+        {
+            public string Echo(string text)
+            {
+                return text;
+            }
+        }
+        static Binding GetBinding()
+        {
+            var result = new BasicHttpBinding(BasicHttpSecurityMode.None);
+            return result;
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), GetBinding(), "");
+            host.Description.Behaviors.Add(new ServiceMetadataBehavior { HttpGetEnabled = true });
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(GetBinding(), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+            Console.WriteLine(proxy.Echo("Hello"));
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_ca54a5fa_8336_4555_b474_03c90832810c
+    {
+        public class Item
+        {
+            public string Id { get; set; }
+            public string Value { get; set; }
+        }
+        public class UseListItemFormatterAttribute : Attribute, IOperationBehavior
+        {
+            public void AddBindingParameters(OperationDescription operationDescription, BindingParameterCollection bindingParameters)
+            {
+            }
+
+            public void ApplyClientBehavior(OperationDescription operationDescription, ClientOperation clientOperation)
+            {
+            }
+
+            public void ApplyDispatchBehavior(OperationDescription operationDescription, DispatchOperation dispatchOperation)
+            {
+            }
+
+            public void Validate(OperationDescription operationDescription)
+            {
+            }
+        }
+        [ServiceContract]
+        public class Service
+        {
+            [WebInvoke(UriTemplate = "/putItems/*")]
+            [UseListItemFormatter]
+            public string putItems(List<Item> items)
+            {
+                Console.WriteLine("In server (PutItems), items.Count = {0}", items.Count);
+                foreach (var item in items)
+                {
+                    Console.WriteLine("  item: {0}={1}", item.Id, item.Value);
+                }
+
+                return null;
+            }
+
+            [WebGet(UriTemplate = "/getItems/*")]
+            [UseListItemFormatter]
+            public string getItems(List<Item> items)
+            {
+                Console.WriteLine("In server (GetItems), items.Count = {0}", items.Count);
+                foreach (var item in items)
+                {
+                    Console.WriteLine("  item: {0}={1}", item.Id, item.Value);
+                }
+
+                return null;
+            }
+        }
+        class MyWebHttpBehavior : WebHttpBehavior
+        {
+            protected override IDispatchMessageFormatter GetRequestDispatchFormatter(OperationDescription operationDescription, ServiceEndpoint endpoint)
+            {
+                if (operationDescription.Behaviors.Find<UseListItemFormatterAttribute>() != null)
+                {
+                    return new MyFormatter(operationDescription, endpoint.Address.Uri);
+                }
+                else
+                {
+                    return base.GetRequestDispatchFormatter(operationDescription, endpoint);
+                }
+            }
+        }
+        class MyFormatter : IDispatchMessageFormatter
+        {
+            private OperationDescription operationDescription;
+            Uri endpointAddress;
+
+            public MyFormatter(OperationDescription operationDescription, Uri endpointAddress)
+            {
+                if (operationDescription.Messages[0].Body.Parts.Count != 1 ||
+                    operationDescription.Messages[0].Body.Parts[0].Type != typeof(List<Item>))
+                {
+                    throw new InvalidOperationException("This formatter can only be used in operations which take a single List<Item> parameter");
+                }
+
+                this.operationDescription = operationDescription;
+                this.endpointAddress = endpointAddress;
+            }
+
+            public void DeserializeRequest(Message message, object[] parameters)
+            {
+                string endpointAddressPath = this.endpointAddress.AbsolutePath;
+                string requestPath = message.Headers.To.AbsolutePath;
+                string afterRequest = requestPath.Substring(endpointAddressPath.Length);
+                string uriTemplate = this.GetUriTemplate();
+                if (afterRequest.StartsWith("/")) afterRequest = afterRequest.Substring(1);
+                if (uriTemplate.StartsWith("/")) uriTemplate = uriTemplate.Substring(1);
+                if (uriTemplate.EndsWith("*")) uriTemplate = uriTemplate.Substring(0, uriTemplate.Length - 1);
+                if (afterRequest.StartsWith(uriTemplate)) afterRequest = afterRequest.Substring(uriTemplate.Length);
+                List<Item> list = new List<Item>();
+                parameters[0] = list;
+                string[] items = afterRequest.Split('/');
+                for (int i = 0; i < items.Length - 1; i += 2)
+                {
+                    list.Add(new Item { Id = items[i], Value = items[i + 1] });
+                }
+            }
+
+            public Message SerializeReply(MessageVersion messageVersion, object[] parameters, object result)
+            {
+                throw new NotSupportedException("This is a Request-only formatter");
+            }
+
+            private string GetUriTemplate()
+            {
+                WebGetAttribute wga = this.operationDescription.Behaviors.Find<WebGetAttribute>();
+                if (wga != null)
+                {
+                    return wga.UriTemplate;
+                }
+                else
+                {
+                    return this.operationDescription.Behaviors.Find<WebInvokeAttribute>().UriTemplate;
+                }
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(Service), new WebHttpBinding(), "").Behaviors.Add(new MyWebHttpBehavior());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            Util.SendRequest(baseAddress + "/putItems/item1/value1/item2/value2/item3/value3", "POST", "application/json", "");
+            Util.SendRequest(baseAddress + "/getItems", "GET", null, null);
+            Util.SendRequest(baseAddress + "/getItems/i1/v1/i2/v2", "GET", null, null);
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/9135439/751090
+    public class StackOverflow_9135439
+    {
+        const string JSON = @"{
+        ""summary"":{
+            ""pricing"":{
+                ""net"":988,
+                ""tax"":13,
+                ""gross"":729
+            },
+            ""status"":{
+                ""runningfor"":29881175,
+                ""stoppedfor"":88805,
+                ""idlefor"":1298331744
+            }
+        }
+    }";
+        [DataContractAttribute(Name = "status")]
+        public class Status
+        {
+            [DataMember(Name = "runningfor")]
+            public int RunningFor { get; set; }
+            [DataMember(Name = "stoppedfor")]
+            public int StoppedFor { get; set; }
+            [DataMember(Name = "idlefor")]
+            public int IdleFor { get; set; }
+        }
+
+        [DataContract]
+        public class Summary
+        {
+            [DataMember(Name = "status")]
+            public Status Status { get; set; }
+
+            // add "pricing" later if you need
+        }
+
+        [DataContract]
+        public class Response
+        {
+            [DataMember(Name = "summary")]
+            public Summary Summary { get; set; }
+        }
+
+        public class JSONHelper
+        {
+            /// <summary>
+            /// JSON Deserialization
+            /// </summary>
+            public static T JsonDeserialize<T>(string jsonString)
+            {
+                T obj = Activator.CreateInstance<T>();
+                MemoryStream ms = new MemoryStream(Encoding.Unicode.GetBytes(jsonString));
+                DataContractJsonSerializer serializer = new DataContractJsonSerializer(obj.GetType());
+                obj = (T)serializer.ReadObject(ms);
+                ms.Close();
+                return obj;
+            }
+        }
+
+        public static void Test()
+        {
+            Response resp = JSONHelper.JsonDeserialize<Response>(JSON);
+            Console.WriteLine(resp.Summary.Status.RunningFor);
+        }
+    }
+
+    public class StackOverflow_9231493
+    {
+        public class Wrapper : IComparable<Wrapper>
+        {
+            internal string value;
+            private double? dbl;
+
+            public Wrapper(string value)
+            {
+                if (value == null) throw new ArgumentNullException("value");
+                this.value = value;
+                double temp;
+                if (double.TryParse(value, out temp))
+                {
+                    dbl = temp;
+                }
+            }
+
+            public int CompareTo(Wrapper other)
+            {
+                if (other == null) return -1;
+                if (this.dbl.HasValue != other.dbl.HasValue)
+                {
+                    return other.dbl.HasValue ? -1 : 1;
+                }
+                else if (!this.dbl.HasValue)
+                {
+                    return this.value.CompareTo(other.value);
+                }
+                else
+                {
+                    return Math.Sign(this.dbl.Value - other.dbl.Value);
+                }
+            }
+        }
+        public static void Test()
+        {
+            List<string> list = new List<string>
+            {
+                "cat",
+                 "4",
+                 "5.4",
+                 "dog",
+                 "-400",
+                 "aardvark",
+                 "12.23.34.54",
+                 "i am a sentence",
+                 "0" ,
+            };
+
+            List<Wrapper> list2 = list.Select(x => new Wrapper(x)).ToList();
+            list2.Sort();
+            Console.WriteLine(string.Join("\n", list2.Select(w => w.value)));
+        }
+    }
+
+    public class Post_270f2713_4b4e_47cf_891b_233cea4c5e8e
+    {
+        [ServiceContract]
+        public class MobileServices
+        {
+            [WebGet]
+            public string DoSomething()
+            {
+                return "Hello";
+            }
+
+            [WebGet]
+            public Stream GetEndpoints()
+            {
+                StringBuilder sb = new StringBuilder();
+                foreach (var ep in OperationContext.Current.Host.Description.Endpoints)
+                {
+                    sb.AppendLine("Endpoint: " + ep.Name);
+                    sb.AppendLine("  Address: " + ep.Address.Uri);
+                    sb.AppendLine("  Binding (scheme): " + ep.Binding.Scheme);
+                    sb.AppendLine("  Contract: " + ep.Contract.Name);
+                }
+
+                WebOperationContext.Current.OutgoingResponse.ContentType = "text/plain";
+                return new MemoryStream(Encoding.UTF8.GetBytes(sb.ToString()));
+            }
+        }
+        public class MyFactory : ServiceHostFactory
+        {
+            protected override ServiceHost CreateServiceHost(Type serviceType, Uri[] baseAddresses)
+            {
+                ServiceHost host = new ServiceHost(serviceType, baseAddresses);
+                foreach (Uri baseAddress in baseAddresses)
+                {
+                    WebHttpBinding binding;
+                    if (baseAddress.Scheme == Uri.UriSchemeHttps)
+                    {
+                        binding = new WebHttpBinding(WebHttpSecurityMode.Transport);
+                    }
+                    else
+                    {
+                        binding = new WebHttpBinding();
+                    }
+
+                    ServiceEndpoint endpoint = host.AddServiceEndpoint(typeof(MobileServices), binding, "");
+                    endpoint.Behaviors.Add(new WebHttpBehavior());
+                }
+
+                return host;
+            }
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            Post_9144d4a8_f12c_4e27_a64d_7ea9092b3300.Test();
+            Post_270f2713_4b4e_47cf_891b_233cea4c5e8e.Test();
         }
     }
 }
