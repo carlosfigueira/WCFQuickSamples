@@ -39,6 +39,7 @@ using System.Xml.Linq;
 using System.Xml.Serialization;
 using System.Xml.XPath;
 using UtilCS;
+using System.Web;
 
 namespace QuickCode2
 {
@@ -10799,11 +10800,240 @@ namespace QuickCode2
         }
     }
 
+    // http://stackoverflow.com/q/9153898/751090
+    public class StackOverflow_9153898
+    {
+        [ServiceContract]
+        public class Service
+        {
+            [WebInvoke(UriTemplate = "/", Method = "POST", BodyStyle = WebMessageBodyStyle.WrappedRequest)]
+            public Stream ProcessPost(string p1, string p2, string p3, string p4)
+            {
+                return Execute(p1, p2, p3, p4);
+            }
+
+            private Stream Execute(string p1, string p2, string p3, string p4)
+            {
+                WebOperationContext.Current.OutgoingResponse.ContentType = "text/plain";
+                string response = p1 + "-" + p2 + "-" + p3 + "-" + p4;
+                return new MemoryStream(Encoding.UTF8.GetBytes(response));
+            }
+        }
+
+        public class MyFormsUrlEncodedBehavior : IEndpointBehavior
+        {
+            public void AddBindingParameters(ServiceEndpoint endpoint, BindingParameterCollection bindingParameters)
+            {
+            }
+
+            public void ApplyClientBehavior(ServiceEndpoint endpoint, ClientRuntime clientRuntime)
+            {
+            }
+
+            public void ApplyDispatchBehavior(ServiceEndpoint endpoint, EndpointDispatcher endpointDispatcher)
+            {
+                foreach (OperationDescription operationDescription in endpoint.Contract.Operations)
+                {
+                    var dispatchOperation = endpointDispatcher.DispatchRuntime.Operations[operationDescription.Name];
+                    dispatchOperation.Formatter = new MyFormsUrlEncodedDispatchFormatter(operationDescription, dispatchOperation.Formatter);
+                }
+            }
+
+            public void Validate(ServiceEndpoint endpoint)
+            {
+            }
+        }
+
+        class MyFormsUrlEncodedDispatchFormatter : IDispatchMessageFormatter
+        {
+            OperationDescription operation;
+            IDispatchMessageFormatter originalFormatter;
+
+            public MyFormsUrlEncodedDispatchFormatter(OperationDescription operation, IDispatchMessageFormatter originalFormatter)
+            {
+                this.operation = operation;
+                this.originalFormatter = originalFormatter;
+            }
+
+            public void DeserializeRequest(Message message, object[] parameters)
+            {
+                var reqProp = message.Properties[HttpRequestMessageProperty.Name] as HttpRequestMessageProperty;
+                if (reqProp.Headers[HttpRequestHeader.ContentType] == "application/x-www-form-urlencoded")
+                {
+                    var bodyReader = message.GetReaderAtBodyContents();
+                    var bodyBytes = bodyReader.ReadElementContentAsBase64();
+                    var body = Encoding.UTF8.GetString(bodyBytes);
+                    NameValueCollection pairs = HttpUtility.ParseQueryString(body);
+                    DeserializeParameters(pairs, parameters);
+                    return;
+                }
+
+                this.originalFormatter.DeserializeRequest(message, parameters);
+            }
+
+            private void DeserializeParameters(NameValueCollection pairs, object[] parameters)
+            {
+                foreach (var part in this.operation.Messages[0].Body.Parts)
+                {
+                    string name = part.Name;
+                    string value = pairs[name];
+                    switch (Type.GetTypeCode(part.Type))
+                    {
+                        case TypeCode.Boolean:
+                            parameters[part.Index] = Convert.ToBoolean(value);
+                            break;
+                        case TypeCode.Byte:
+                            parameters[part.Index] = Convert.ToByte(value);
+                            break;
+                        case TypeCode.Char:
+                            parameters[part.Index] = Convert.ToChar(value);
+                            break;
+                        // Skipped many others
+                        case TypeCode.String:
+                            parameters[part.Index] = value;
+                            break;
+                        default:
+                            throw new NotImplementedException("Not implemented for type " + part.Type);
+                    }
+                }
+            }
+
+            public Message SerializeReply(MessageVersion messageVersion, object[] parameters, object result)
+            {
+                return this.originalFormatter.SerializeReply(messageVersion, parameters, result);
+            }
+        }
+
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            ServiceEndpoint endpoint = host.AddServiceEndpoint(typeof(Service), new WebHttpBinding(), "");
+            endpoint.Behaviors.Add(new WebHttpBehavior());
+            endpoint.Behaviors.Add(new MyFormsUrlEncodedBehavior());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            c.Headers[HttpRequestHeader.ContentType] = "application/x-www-form-urlencoded";
+            Console.WriteLine(c.UploadString(baseAddress + "/", "p1=str1&p2=str2&p3=str3&p4=str4"));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_e8019882_3424_40bd_a13a_97a7de9cf51e
+    {
+        [ServiceContract]
+        public class Service
+        {
+            [OperationContract]
+            [WebInvoke(Method = "GET",
+                 ResponseFormat = WebMessageFormat.Json,
+                UriTemplate = "Event")]
+            public WrappedResponse selectEvent()
+            {
+                WrappedResponse result = new WrappedResponse
+                {
+                    success = true,
+                    message = "Loaded data",
+                    data = new List<Event>
+                    {
+                        new Event
+                        {
+                            id = 1,
+                            cid = 1,
+                            title = "Test Event",
+                            start = "11/02/2012 15:30:27",
+                            end ="11/02/2012 17:30:27",
+                            notes= "Don't forget the tickets",
+                            url= "",
+                            ad = false,
+                            loc = "Pune",
+                            rem = "NA"
+                        }
+                    }
+                };
+
+                return result;
+            }
+        }
+        [DataContract(Namespace = "")]
+        public class Event
+        {
+            [DataMember(Order = 0)]
+            public int id { get; set; }
+            [DataMember(Order = 1)]
+            public int cid { get; set; }
+            [DataMember(Order = 2)]
+            public string title { get; set; }
+            [DataMember(Order = 3)]
+            public string start { get; set; }
+            [DataMember(Order = 4)]
+            public string end { get; set; }
+            [DataMember(Order = 5)]
+            public string notes { get; set; }
+            [DataMember(Order = 6)]
+            public string url { get; set; }
+            [DataMember(Order = 7)]
+            public Boolean ad { get; set; }
+            [DataMember(Order = 8)]
+            public string loc { get; set; }
+            [DataMember(Order = 9)]
+            public string rem { get; set; }
+        }
+        [DataContract]
+        public class WrappedResponse
+        {
+            [DataMember(Order = 1)]
+            public bool success;
+            [DataMember(Order = 2)]
+            public string message;
+            [DataMember(Order = 3)]
+            public List<Event> data;
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            Console.WriteLine(c.DownloadString(baseAddress + "/Event"));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/9342355/751090
+    public class StackOverflow_9342355
+    {
+        public static void Test()
+        {
+            string output = "test: {0} matches";
+            string test = "AND [Field] =";
+
+            Regex r = new Regex(@"(AND|OR)\s\[?\w+\]?\s?=");
+
+            if (r.IsMatch(test))
+                Console.WriteLine(string.Format(output, test));
+
+            test = "OR [Field] =";
+            if (r.IsMatch(test))
+                Console.WriteLine(string.Format(output, test));
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            Post_b5b4dd05_50cf_4799_a892_be706868f5a7.Test();
+            StackOverflow_9342355.Test();
         }
     }
 }
