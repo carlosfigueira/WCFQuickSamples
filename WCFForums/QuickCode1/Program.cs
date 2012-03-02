@@ -19521,11 +19521,149 @@ namespace QuickCode1
         }
     }
 
+    public class Post_56d0036b_58db_4411_978e_6be491ec42e4
+    {
+        [XmlRoot(ElementName = "ThingList", Namespace = "")]
+        [XmlType(TypeName = "ThingList", Namespace = "")]
+        public class ThingList
+        {
+            [XmlElement(ElementName = "Thing")]
+            public List<Thing> myThingList;
+        }
+
+        [XmlRoot(ElementName = "thing")]
+        public class Thing
+        {
+            [XmlElement(ElementName = "OneThing")]
+            public int oneThing;
+            [XmlElement(ElementName = "Another")]
+            public string another;
+        }
+
+        [ServiceContract(Namespace = "")]
+        [XmlSerializerFormat]
+        public interface IThingService
+        {
+            [OperationContract]
+            [WebGet(UriTemplate = "/list", ResponseFormat = WebMessageFormat.Xml)]
+            ThingList getThingList();
+        }
+
+        public class Service : IThingService
+        {
+            public ThingList getThingList()
+            {
+                return new ThingList
+                {
+                    myThingList = new List<Thing>
+                    {
+                        new Thing { oneThing = 1, another = "a" },
+                        new Thing { oneThing = 2, another = "b" }
+                    }
+                };
+            }
+        }
+
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            Console.WriteLine(c.DownloadString(baseAddress + "/list"));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // Converting GET requests to POST requests
+    public class MyCode_9
+    {
+        [ServiceContract(Namespace = "")]
+        public class Service
+        {
+            [WebInvoke(BodyStyle = WebMessageBodyStyle.WrappedRequest)]
+            public int Add(int x, int y)
+            {
+                return x + y;
+            }
+        }
+        class MyWebHttpBehavior : WebHttpBehavior
+        {
+            protected override WebHttpDispatchOperationSelector GetOperationSelector(ServiceEndpoint endpoint)
+            {
+                return new MyOperationSelector(endpoint);
+            }
+
+            class MyOperationSelector : WebHttpDispatchOperationSelector
+            {
+                public MyOperationSelector(ServiceEndpoint endpoint)
+                    : base(endpoint)
+                {
+                }
+
+                public override UriTemplate GetUriTemplate(string operationName)
+                {
+                    UriTemplate result = base.GetUriTemplate(operationName);
+                    return result;
+                }
+
+                protected override string SelectOperation(ref Message message, out bool uriMatched)
+                {
+                    HttpRequestMessageProperty httpProp = (HttpRequestMessageProperty)message.Properties[HttpRequestMessageProperty.Name];
+                    if (httpProp.Method == "GET")
+                    {
+                        string body = "<Add><x>6</x><y>9</y></Add>";
+                        MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(body));
+                        XmlReader r = XmlReader.Create(ms);
+                        Message newRequest = Message.CreateMessage(MessageVersion.None, null, r);
+                        newRequest.Properties.CopyProperties(message.Properties);
+                        newRequest.Headers.CopyHeadersFrom(message);
+
+                        httpProp = (HttpRequestMessageProperty)message.Properties[HttpRequestMessageProperty.Name];
+                        httpProp.Method = "POST";
+                        WebBodyFormatMessageProperty bodyFormat = new WebBodyFormatMessageProperty(WebContentFormat.Xml);
+                        newRequest.Properties.Add(WebBodyFormatMessageProperty.Name, bodyFormat);
+
+                        message = newRequest;
+                    }
+
+                    string result = base.SelectOperation(ref message, out uriMatched);
+                    return result;
+                }
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            ServiceEndpoint endpoint = host.AddServiceEndpoint(typeof(Service), new WebHttpBinding(), "");
+            endpoint.Behaviors.Add(new MyWebHttpBehavior());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            c.Headers[HttpRequestHeader.ContentType] = "text/xml";
+            Console.WriteLine(c.UploadString(baseAddress + "/Add", "<Add><x>6</x><y>9</y></Add>"));
+
+            c = new WebClient();
+            Console.WriteLine(c.DownloadString(baseAddress + "/Add"));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            Post_270f2713_4b4e_47cf_891b_233cea4c5e8e.Test();
+            MyCode_9.Test();
         }
     }
 }
