@@ -11029,11 +11029,480 @@ namespace QuickCode2
         }
     }
 
+    public class Post_7904f704_dd4c_4a13_b352_657412ffff6e
+    {
+        [ServiceContract(
+            Name = "ICashierCallback",
+            Namespace = "WEBCashier")]
+        public interface ICashierCallback
+        {
+            [OperationContract(IsOneWay = true)]
+            void CallbackFunction(double result);
+        }
+        [ServiceContract(
+            CallbackContract = typeof(ICashierCallback),
+            Namespace = "WEBCashier",
+            Name = "ICashierService",
+            SessionMode = SessionMode.Required)]
+        public interface ICashierService
+        {
+            [OperationContract]
+            string GetData(int value);
+        }
+        public class CashierService : ICashierService
+        {
+            public string GetData(int value)
+            {
+                return "XXXXXXXXXXX";
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(CashierService), new Uri(baseAddress));
+            WSDualHttpBinding binding = new WSDualHttpBinding(WSDualHttpSecurityMode.None);
+            host.AddServiceEndpoint(typeof(ICashierService), binding, "");
+            host.Description.Behaviors.Add(new ServiceMetadataBehavior { HttpGetEnabled = true });
+            host.Open();
+            Console.WriteLine("Host opened");
+            Console.WriteLine("Press ENTER to close");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_fdb4ea47_18e3_4169_8e1d_0d1ca2b449dc
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [WebGet(ResponseFormat = WebMessageFormat.Json)]
+            string Echo(string text);
+        }
+        public class Service : ITest
+        {
+            public string Echo(string text)
+            {
+                if (text == "exception")
+                {
+                    throw new ArgumentException("Simple exception");
+                }
+                else if (text == "nestedException")
+                {
+                    throw new ArgumentException("Outer exception",
+                        new InvalidOperationException("Inner exception 1",
+                            new ArgumentOutOfRangeException("text", "Inner exception 2")));
+                }
+                else
+                {
+                    return text;
+                }
+            }
+        }
+        class MyErrorHandler : IEndpointBehavior, IErrorHandler
+        {
+            public void AddBindingParameters(ServiceEndpoint endpoint, BindingParameterCollection bindingParameters)
+            {
+            }
+
+            public void ApplyClientBehavior(ServiceEndpoint endpoint, ClientRuntime clientRuntime)
+            {
+            }
+
+            public void ApplyDispatchBehavior(ServiceEndpoint endpoint, EndpointDispatcher endpointDispatcher)
+            {
+                endpointDispatcher.ChannelDispatcher.ErrorHandlers.Add(this);
+            }
+
+            public void Validate(ServiceEndpoint endpoint)
+            {
+            }
+
+            public bool HandleError(Exception error)
+            {
+                return true;
+            }
+
+            public void ProvideFault(Exception error, MessageVersion version, ref Message fault)
+            {
+                StringBuilder sb = new StringBuilder();
+                sb.AppendFormat("{0}: {1}", error.GetType().FullName, error.Message);
+                Exception inner = error.InnerException;
+                while (inner != null)
+                {
+                    sb.AppendLine();
+                    sb.AppendFormat("    {0}: {1}", inner.GetType().FullName, inner.Message);
+                    inner = inner.InnerException;
+                }
+
+                fault = Message.CreateMessage(version, null, new MyBodyWriter(sb.ToString()));
+                fault.Properties.Add(WebBodyFormatMessageProperty.Name, new WebBodyFormatMessageProperty(WebContentFormat.Raw));
+            }
+
+            class MyBodyWriter : BodyWriter
+            {
+                string text;
+                public MyBodyWriter(string text)
+                    : base(true)
+                {
+                    this.text = text;
+                }
+
+                protected override void OnWriteBodyContents(XmlDictionaryWriter writer)
+                {
+                    writer.WriteStartElement("Binary");
+                    byte[] bytes = Encoding.UTF8.GetBytes(this.text);
+                    writer.WriteBase64(bytes, 0, bytes.Length);
+                    writer.WriteEndElement();
+                }
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            ServiceEndpoint endpoint = host.AddServiceEndpoint(typeof(ITest), new WebHttpBinding(), "");
+            endpoint.Behaviors.Add(new WebHttpBehavior());
+            endpoint.Behaviors.Add(new MyErrorHandler());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            Util.SendRequest(baseAddress + "/Echo?text=no+exception", "GET", null, null);
+            Util.SendRequest(baseAddress + "/Echo?text=exception", "GET", null, null);
+            Util.SendRequest(baseAddress + "/Echo?text=nestedException", "GET", null, null);
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_334b9b23_950c_4b58_b120_b19dc9478ad5
+    {
+        [ServiceContract]
+        public class Service
+        {
+            [WebGet]
+            public int Add(int x, int y)
+            {
+                return x + y;
+            }
+
+            [WebGet]
+            public int Subtract(int x, int y)
+            {
+                return x - y;
+            }
+        }
+        public class MyInspector : IEndpointBehavior, IDispatchMessageInspector
+        {
+            public void AddBindingParameters(ServiceEndpoint endpoint, BindingParameterCollection bindingParameters)
+            {
+            }
+
+            public void ApplyClientBehavior(ServiceEndpoint endpoint, ClientRuntime clientRuntime)
+            {
+            }
+
+            public void ApplyDispatchBehavior(ServiceEndpoint endpoint, EndpointDispatcher endpointDispatcher)
+            {
+                endpointDispatcher.DispatchRuntime.MessageInspectors.Add(this);
+            }
+
+            public void Validate(ServiceEndpoint endpoint)
+            {
+            }
+
+            public object AfterReceiveRequest(ref Message request, IClientChannel channel, InstanceContext instanceContext)
+            {
+                HttpRequestMessageProperty prop;
+                prop = request.Properties[HttpRequestMessageProperty.Name] as HttpRequestMessageProperty;
+                if (prop != null)
+                {
+                    if (prop.Method == "GET")
+                    {
+                        NameValueCollection nvc = HttpUtility.ParseQueryString(prop.QueryString);
+                        string callback = nvc["callback"];
+                        if (!string.IsNullOrEmpty(callback))
+                        {
+                            Regex letterNumberOnly = new Regex(@"^[0-9a-zA-Z]+$");
+                            if (!letterNumberOnly.IsMatch(callback))
+                            {
+                                throw new Exception("This will abort the request, causing a 400 to be returned to the client");
+                            }
+                        }
+                    }
+                }
+
+                return null;
+            }
+
+            public void BeforeSendReply(ref Message reply, object correlationState)
+            {
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            WebHttpBinding binding = new WebHttpBinding();
+            binding.CrossDomainScriptAccessEnabled = true;
+            ServiceEndpoint endpoint = host.AddServiceEndpoint(typeof(Service), binding, "");
+            WebHttpBehavior behavior = new WebHttpBehavior();
+            behavior.DefaultOutgoingResponseFormat = WebMessageFormat.Json;
+            endpoint.Behaviors.Add(behavior);
+            endpoint.Behaviors.Add(new MyInspector());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c;
+
+            c = new WebClient();
+            Console.WriteLine("No callback:");
+            Console.WriteLine(c.DownloadString(baseAddress + "/Add?x=6&y=8"));
+            Console.WriteLine();
+
+            c = new WebClient();
+            Console.WriteLine("Valid callback:");
+            Console.WriteLine(c.DownloadString(baseAddress + "/Add?x=6&y=8&callback=Func"));
+            Console.WriteLine();
+
+            c = new WebClient();
+            try
+            {
+                Console.WriteLine("Invalid callback:");
+                Console.WriteLine(c.DownloadString(baseAddress + "/Add?x=6&y=8&callback=Fu-nc"));
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+            }
+
+            Console.WriteLine();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_5e77450e_7574_4c48_ae64_71e3cf649fbb
+    {
+        [ServiceContract, XmlSerializerFormat]
+        public interface ITest
+        {
+            [OperationContract]
+            void ResidentAddress(int residentID, XmlNode addressData);
+        }
+        public class Service : ITest
+        {
+            public void ResidentAddress(int residentID, XmlNode addressData)
+            {
+                Console.WriteLine("In ResidentAddress: {0}", addressData.OuterXml);
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding(), "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(new BasicHttpBinding(), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+
+            XmlDocument doc = new XmlDocument();
+            doc.LoadXml(@"<?xml version=""1.0"" encoding=""utf-8""?>
+      <ResidentData xmlns:xsd=""http://www.w3.org/2001/XMLSchema"" xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"">
+       <Address>
+            <ResidentAddress>
+                 <AddressType>REGULAR</AddressType>
+                 <Adr1>123 Main St</Adr1>
+                 <Zip>75000</Zip>
+                 <Email>nobody@nowhere.com</Email>
+             </ResidentAddress>
+         </Address>
+ </ResidentData>");
+            proxy.ResidentAddress(1, doc);
+
+            doc = new XmlDocument();
+            doc.AppendChild(doc.CreateElement("ResidentData"));
+            doc.DocumentElement.AppendChild(doc.CreateElement("Address"));
+            XmlElement residentAddress = doc.CreateElement("ResidentAddress");
+            doc.DocumentElement.FirstChild.AppendChild(residentAddress);
+            residentAddress.AppendChild(CreateElementWithText(doc, "AddressType", "REGULAR"));
+            residentAddress.AppendChild(CreateElementWithText(doc, "Add1", "123 Main St"));
+            residentAddress.AppendChild(CreateElementWithText(doc, "Zip", "75000"));
+            residentAddress.AppendChild(CreateElementWithText(doc, "Email", "nobody@nowhere.com"));
+            proxy.ResidentAddress(2, doc);
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+
+        static XmlElement CreateElementWithText(XmlDocument doc, string elementName, string text)
+        {
+            XmlElement result = doc.CreateElement(elementName);
+            result.AppendChild(doc.CreateTextNode(text));
+            return result;
+        }
+    }
+
+    public class Post_938156c7_ccb5_4436_833d_d560b9901750
+    {
+        public static void Test()
+        {
+            for (int stringSize = 680; stringSize < 700; stringSize++)
+            {
+                string str = new string((char)0x6cd5, stringSize);
+                string jsonString = "\"" + str + "\"";
+                //MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(jsonString));
+                //XmlDictionaryReader jsonReader = JsonReaderWriterFactory.CreateJsonReader(ms, XmlDictionaryReaderQuotas.Max);
+                byte[] jsonBytes = Encoding.UTF8.GetBytes(jsonString);
+                XmlDictionaryReader jsonReader = JsonReaderWriterFactory.CreateJsonReader(jsonBytes, XmlDictionaryReaderQuotas.Max);
+                DataContractJsonSerializer dcjs = new DataContractJsonSerializer(typeof(string));
+                try
+                {
+                    // old - string str2 = (string)dcjs.ReadObject(ms);
+                    string str2 = (string)dcjs.ReadObject(jsonReader);
+                    if (str == str2)
+                    {
+                        Console.Write(".");
+                    }
+                    else
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine("Error, different strings for stringSize = {0}", stringSize);
+                    }
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("{0}: {1}", e.GetType().FullName, e.Message);
+                }
+                if ((stringSize % 50) == 49) Console.WriteLine();
+            }
+        }
+    }
+
+    public class Post_ac21a51a_a436_4b89_91d1_29dc6c789487
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string Echo(string text);
+        }
+        public class Service : ITest, IDisposable
+        {
+            public Service()
+            {
+                Console.WriteLine("I'm being created now");
+            }
+
+            public string Echo(string text)
+            {
+                return text;
+            }
+
+            public void Dispose()
+            {
+                Console.WriteLine("I'm being disposed now");
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding(), "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(new BasicHttpBinding(), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+            Console.WriteLine("Calling the service");
+            string result = proxy.Echo("Hello");
+            Console.WriteLine("Result: {0}", result);
+
+            Console.WriteLine();
+
+            Console.WriteLine("Calling the service again");
+            result = proxy.Echo("World");
+            Console.WriteLine("Result: {0}", result);
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_a72c9431_ce05_43c7_be9e_4aa514c842d7
+    {
+        public class MyJsonPEnabledWebServiceHostFactory : WebServiceHostFactory
+        {
+            protected override ServiceHost CreateServiceHost(Type serviceType, Uri[] baseAddresses)
+            {
+                ServiceHost host = base.CreateServiceHost(serviceType, baseAddresses);
+                foreach (var endpoint in host.Description.Endpoints)
+                {
+                    WebHttpBinding webBinding = endpoint.Binding as WebHttpBinding;
+                    if (webBinding != null)
+                    {
+                        webBinding.CrossDomainScriptAccessEnabled = true;
+                    }
+                }
+
+                return host;
+            }
+        }
+    }
+
+    public class Post_4d4bec90_15ee_49d5_810a_eca0c03e6c2d
+    {
+        public static void Test()
+        {
+            Compare(MessageVersion.None,
+                MessageVersion.CreateVersion(EnvelopeVersion.None, AddressingVersion.None));
+
+            Compare(MessageVersion.Soap11,
+                MessageVersion.CreateVersion(EnvelopeVersion.Soap11, AddressingVersion.None));
+
+            Compare(MessageVersion.Soap11WSAddressing10,
+                MessageVersion.CreateVersion(EnvelopeVersion.Soap11, AddressingVersion.WSAddressing10));
+
+            Compare(MessageVersion.Soap11WSAddressingAugust2004,
+                MessageVersion.CreateVersion(EnvelopeVersion.Soap11, AddressingVersion.WSAddressingAugust2004));
+
+            Compare(MessageVersion.Soap12,
+                MessageVersion.CreateVersion(EnvelopeVersion.Soap12, AddressingVersion.None));
+
+            Compare(MessageVersion.Soap12WSAddressing10,
+                MessageVersion.CreateVersion(EnvelopeVersion.Soap12, AddressingVersion.WSAddressing10));
+
+            Compare(MessageVersion.Soap12WSAddressingAugust2004,
+                MessageVersion.CreateVersion(EnvelopeVersion.Soap12, AddressingVersion.WSAddressingAugust2004));
+        }
+
+        static void Compare(MessageVersion mv1, MessageVersion mv2)
+        {
+            Console.WriteLine(object.ReferenceEquals(mv1, mv2));
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_9342355.Test();
+            Post_4d4bec90_15ee_49d5_810a_eca0c03e6c2d.Test();
+            Console.WriteLine(DateTime.UtcNow);
         }
     }
 }
