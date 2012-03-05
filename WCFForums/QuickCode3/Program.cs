@@ -14036,11 +14036,64 @@ Date: Mon, 23 May 2011 06:56:18 GMT
         }
     }
 
+    // http://stackoverflow.com/q/9231493/751090
+    public class StackOverflow_9231493
+    {
+        public static void Test()
+        {
+            List<string> list = new List<string>
+            {
+                "cat",
+                 "4",
+                 "5.4",
+                 "dog",
+                 "-400",
+                 "aardvark",
+                 "12.23.34.54",
+                 "i am a sentence",
+                 "0" ,
+            };
+
+            list.Sort(new Comparison<string>(delegate(string s1, string s2)
+            {
+                double d1, d2;
+                bool isNumber1, isNumber2;
+                isNumber1 = double.TryParse(s1, out d1);
+                isNumber2 = double.TryParse(s2, out d2);
+                if (isNumber1 != isNumber2)
+                {
+                    return isNumber2 ? -1 : 1;
+                }
+                else if (!isNumber1)
+                {
+                    return s1.CompareTo(s2);
+                }
+                else
+                {
+                    return Math.Sign(d1 - d2);
+                }
+            }));
+
+            Console.WriteLine(string.Join("\n", list));
+        }
+    }
+
+    public class Post_b2c87e89_7e8f_45ea_8f3b_a32479af8eca
+    {
+        public static void Test()
+        {
+            byte[] bytes = Convert.FromBase64String("ZG9tYWluXHVzZXJuYW1l");
+            Console.WriteLine(Encoding.UTF8.GetString(bytes));
+            bytes = Convert.FromBase64String("cGFzc3dvcmQx");
+            Console.WriteLine(Encoding.UTF8.GetString(bytes));
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            Post_73c1b1c2_8085_46d0_9635_efcef68bcc70.Test();
+            Post_b2c87e89_7e8f_45ea_8f3b_a32479af8eca.Test();
         }
     }
 }

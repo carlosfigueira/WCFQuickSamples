@@ -1,0 +1,4 @@
+﻿<%@ ServiceHost Language="C#" Debug="true"
+                Service="Post_a72c9431_ce05_43c7_be9e_4aa514c842d7.Service1"
+                Factory="Post_a72c9431_ce05_43c7_be9e_4aa514c842d7.MyJsonPEnabledWebServiceHostFactory"
+                CodeBehind="Post_a72c9431_ce05_43c7_be9e_4aa514c842d7.svc.cs" %>

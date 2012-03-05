@@ -36,6 +36,7 @@
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.ServiceModel" />
+    <Reference Include="System.ServiceModel.Activation" />
     <Reference Include="System.ServiceModel.Web" />
     <Reference Include="System.Web.DynamicData" />
     <Reference Include="System.Web.Entity" />
@@ -54,6 +55,7 @@
     <Reference Include="System.EnterpriseServices" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Post_a72c9431_ce05_43c7_be9e_4aa514c842d7.svc" />
     <Content Include="HTMLPage1.htm" />
     <Content Include="Post_ca5941b4_bfcf_4546_a418_cc91a321c2fb.svc" />
     <Content Include="StackOverflow_8537634.svc" />
@@ -68,6 +70,9 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Post_a72c9431_ce05_43c7_be9e_4aa514c842d7.svc.cs">
+      <DependentUpon>Post_a72c9431_ce05_43c7_be9e_4aa514c842d7.svc</DependentUpon>
+    </Compile>
     <Compile Include="Post_ca5941b4_bfcf_4546_a418_cc91a321c2fb.svc.cs">
       <DependentUpon>Post_ca5941b4_bfcf_4546_a418_cc91a321c2fb.svc</DependentUpon>
     </Compile>
