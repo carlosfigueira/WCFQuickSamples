@@ -55,6 +55,8 @@
     <Reference Include="System.EnterpriseServices" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="images\1.png" />
+    <Content Include="images\2.png" />
     <Content Include="Post_a72c9431_ce05_43c7_be9e_4aa514c842d7.svc" />
     <Content Include="HTMLPage1.htm" />
     <Content Include="Post_ca5941b4_bfcf_4546_a418_cc91a321c2fb.svc" />
