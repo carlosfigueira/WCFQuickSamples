@@ -20,6 +20,12 @@ namespace Post_a72c9431_ce05_43c7_be9e_4aa514c842d7
     {
         public int Add(int x, int y)
         {
+            string changeContentType = WebOperationContext.Current.IncomingRequest.UriTemplateMatch.QueryParameters["changeContentType"];
+            if (!string.IsNullOrEmpty(changeContentType))
+            {
+                WebOperationContext.Current.OutgoingResponse.ContentType = "application/x-my-javascript";
+            }
+
             return x + y;
         }
     }
@@ -28,7 +34,7 @@ namespace Post_a72c9431_ce05_43c7_be9e_4aa514c842d7
     {
         protected override ServiceHost CreateServiceHost(Type serviceType, Uri[] baseAddresses)
         {
-            return base.CreateServiceHost(serviceType, baseAddresses);
+            return new MyJsonPEnabledWebServiceHost(serviceType, baseAddresses);
         }
     }
 
@@ -47,6 +53,11 @@ namespace Post_a72c9431_ce05_43c7_be9e_4aa514c842d7
                 WebHttpBinding webBinding = endpoint.Binding as WebHttpBinding;
                 if (webBinding != null)
                 {
+                    if (webBinding.Security.Mode == WebHttpSecurityMode.TransportCredentialOnly)
+                    {
+                        webBinding.Security.Mode = WebHttpSecurityMode.None;
+                    }
+
                     webBinding.CrossDomainScriptAccessEnabled = true;
                 }
             }

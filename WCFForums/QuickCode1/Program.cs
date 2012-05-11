@@ -146,7 +146,7 @@ namespace QuickCode1
             public Stream DownloadFile(string fileName)
             {
                 WebOperationContext.Current.OutgoingResponse.Headers["Content-Disposition"] = "attachment; filename=" + fileName;
-                return new MyReadonlyStream(200000000); //200MB
+                return new MyReadonlyStream(2000000000); //2GB
             }
 
             public void UploadFile(string fileName, Stream fileContents)
@@ -19659,11 +19659,622 @@ namespace QuickCode1
         }
     }
 
+    public class Post_9042d0a2_74c7_4e3c_a4b8_b39a6d1ad890
+    {
+        public static void Test()
+        {
+            Console.WriteLine("Testing with a text-only file");
+            string file = Path.GetTempFileName();
+            List<string> lines = new List<string>();
+            for (int i = 0; i < 100; i++)
+            {
+                lines.Add("This is the line number " + i + " of this file.");
+            }
+
+            File.WriteAllLines(file, lines.ToArray());
+            TestWith(file);
+            Console.WriteLine();
+
+            Console.WriteLine("Now testing with a real binary file");
+            byte[] bytes = new byte[1234];
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                bytes[i] = (byte)i;
+            }
+            File.WriteAllBytes(file, bytes);
+
+            TestWith(file);
+
+            File.Delete(file);
+        }
+
+        static void TestWith(string fileName)
+        {
+            Console.WriteLine("Serializing...");
+            string serialized = Serialize(fileName);
+            Console.WriteLine("Deserializing...");
+            TestAttachment att = Deserialize(serialized);
+            byte[] fileContents = File.ReadAllBytes(fileName);
+            Console.WriteLine("Length: {0} - {1}", fileContents.Length, att.File.Length);
+            bool same = false;
+            if (fileContents.Length == att.File.Length)
+            {
+                same = true;
+                for (int i = 0; i < fileContents.Length; i++)
+                {
+                    if (fileContents[i] != att.File[i])
+                    {
+                        Console.WriteLine("Different at byte {0}", i);
+                        same = false;
+                        break;
+                    }
+                }
+            }
+
+            if (same)
+            {
+                Console.WriteLine("Files are the same");
+            }
+            else
+            {
+                Console.WriteLine("Files are different!");
+            }
+        }
+
+        static string Serialize(string Filename)
+        {
+            TestAttachment Attachment = new TestAttachment();
+            Attachment.Filename = Filename;
+            Attachment.File = File.ReadAllBytes(Filename);
+            MemoryStream MTOMInMemory = new MemoryStream();
+            XmlDictionaryWriter XDW = XmlDictionaryWriter.CreateMtomWriter(MTOMInMemory, Encoding.UTF8, Int32.MaxValue, "text/xml");
+            DataContractSerializer DCS = new DataContractSerializer(Attachment.GetType());
+            DCS.WriteObject(XDW, Attachment);
+            XDW.Flush();
+            return UTF8Encoding.UTF8.GetString(MTOMInMemory.ToArray());
+        }
+
+        static TestAttachment Deserialize(string MTOMMessage)
+        {
+            try
+            {
+                MemoryStream MTOMMessageInMemory = new MemoryStream(UTF8Encoding.UTF8.GetBytes(MTOMMessage));
+                XmlDictionaryReader XDR = XmlDictionaryReader.CreateMtomReader(MTOMMessageInMemory, Encoding.UTF8, XmlDictionaryReaderQuotas.Max);
+                DataContractSerializer DCS = new DataContractSerializer(typeof(TestAttachment));
+                return (TestAttachment)DCS.ReadObject(XDR);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        [DataContract()]
+        public class TestAttachment
+        {
+            private byte[] fileField;
+            private string filenameField;
+
+            [DataMember()]
+            public byte[] File
+            {
+                get { return this.fileField; }
+                set { this.fileField = value; }
+            }
+
+            [DataMember()]
+            public string Filename
+            {
+                get { return this.filenameField; }
+                set { this.filenameField = value; }
+            }
+        }
+    }
+
+    public class Post_e5b80615_143b_4e9a_81c7_df34eed6175f
+    {
+        [DataContract]
+        public class person
+        {
+            [DataMember]
+            public string firstName { get; set; }
+            [DataMember]
+            public string lastName { get; set; }
+            [DataMember]
+            public string fisrtLetter { get; set; }
+        }
+
+        [ServiceContract]
+        public interface IRestServiceImpl
+        {
+            [OperationContract]
+            [WebInvoke(Method = "GET",
+                ResponseFormat = WebMessageFormat.Json,
+                RequestFormat = WebMessageFormat.Json,
+                BodyStyle = WebMessageBodyStyle.WrappedResponse,
+                UriTemplate = "jsonobj/?quantidade={qtde}&firstLetter={fl}")]
+            [return:MessageParameter(Name = "Person")]
+            List<person> Person(string qtde, string fl);
+        }
+
+        public class Service : IRestServiceImpl
+        {
+            public List<person> Person(string qtde, string fl)
+            {
+                List<person> result = new List<person>();
+
+                for (int i = 0; i < int.Parse(qtde); i++)
+                {
+                    person p = new person() { firstName = "Gustavo", lastName = "Bergamo", fisrtLetter = fl };
+                    result.Add(p);
+                    p = null;
+                }
+
+                return result;
+            }
+        }
+
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            Console.WriteLine(c.DownloadString(baseAddress + "/jsonobj/?quantidade=3&fl=G"));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_f49e181a_c9bd_46e2_ade9_a516f579929f
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string GetData();
+        }
+        public class Service : ITest
+        {
+            public string GetData()
+            {
+                return "Hello\u0000world";
+            }
+        }
+        [ServiceContract]
+        public class SimulatedService
+        {
+            [OperationContract]
+            public Stream GetData()
+            {
+                string xml = "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Header/><s:Body><GetDataResponse xmlns=\"http://tempuri.org/\"><GetDataResult>Hello\u0000world</GetDataResult></GetDataResponse></s:Body></s:Envelope>";
+                WebOperationContext.Current.OutgoingResponse.ContentType = "text/xml; charset=utf-8";
+                Encoding encoding = new UTF8Encoding(false);
+                return new MemoryStream(encoding.GetBytes(xml));
+            }
+        }
+        public class ReplaceInvalidXmlCharsEncodingBindingElement : MessageEncodingBindingElement
+        {
+            MessageEncodingBindingElement inner;
+            public ReplaceInvalidXmlCharsEncodingBindingElement(MessageEncodingBindingElement inner)
+            {
+                this.inner = inner;
+            }
+
+            private ReplaceInvalidXmlCharsEncodingBindingElement(ReplaceInvalidXmlCharsEncodingBindingElement other)
+            {
+                this.inner = other.inner;
+            }
+
+            public override MessageEncoderFactory CreateMessageEncoderFactory()
+            {
+                return new ReplaceInvalidXmlCharsEncoderFactory(this.inner.CreateMessageEncoderFactory());
+            }
+
+            public override MessageVersion MessageVersion
+            {
+                get { return this.inner.MessageVersion; }
+                set { this.inner.MessageVersion = value; }
+            }
+
+            public override BindingElement Clone()
+            {
+                return new ReplaceInvalidXmlCharsEncodingBindingElement(this);
+            }
+
+            public override IChannelListener<TChannel> BuildChannelListener<TChannel>(BindingContext context)
+            {
+                context.BindingParameters.Add(this);
+                return context.BuildInnerChannelListener<TChannel>();
+            }
+
+            public override bool CanBuildChannelListener<TChannel>(BindingContext context)
+            {
+                return context.CanBuildInnerChannelListener<TChannel>();
+            }
+
+            public override bool CanBuildChannelFactory<TChannel>(BindingContext context)
+            {
+                return context.CanBuildInnerChannelFactory<TChannel>();
+            }
+
+            public override IChannelFactory<TChannel> BuildChannelFactory<TChannel>(BindingContext context)
+            {
+                context.BindingParameters.Add(this);
+                return context.BuildInnerChannelFactory<TChannel>();
+            }
+
+            public static CustomBinding ReplaceEncodingBindingElement(Binding originalBinding)
+            {
+                CustomBinding custom = originalBinding as CustomBinding;
+                if (custom == null)
+                {
+                    custom = new CustomBinding(originalBinding);
+                }
+
+                for (int i = 0; i < custom.Elements.Count; i++)
+                {
+                    if (custom.Elements[i] is MessageEncodingBindingElement)
+                    {
+                        ReplaceInvalidXmlCharsEncodingBindingElement element = new ReplaceInvalidXmlCharsEncodingBindingElement((MessageEncodingBindingElement)custom.Elements[i]);
+                        custom.Elements[i] = element;
+                        break;
+                    }
+                }
+
+                return custom;
+            }
+
+            class ReplaceInvalidXmlCharsEncoderFactory : MessageEncoderFactory
+            {
+                private MessageEncoderFactory messageEncoderFactory;
+
+                public ReplaceInvalidXmlCharsEncoderFactory(MessageEncoderFactory messageEncoderFactory)
+                {
+                    this.messageEncoderFactory = messageEncoderFactory;
+                }
+
+                public override MessageEncoder Encoder
+                {
+                    get { return new ReplaceInvalidXmlCharsEncoder(this.messageEncoderFactory.Encoder); }
+                }
+
+                public override MessageVersion MessageVersion
+                {
+                    get { return this.messageEncoderFactory.MessageVersion; }
+                }
+
+                public override MessageEncoder CreateSessionEncoder()
+                {
+                    return new ReplaceInvalidXmlCharsEncoder(this.messageEncoderFactory.CreateSessionEncoder());
+                }
+            }
+
+            class ReplaceInvalidXmlCharsEncoder : MessageEncoder
+            {
+                private MessageEncoder messageEncoder;
+
+                public ReplaceInvalidXmlCharsEncoder(MessageEncoder messageEncoder)
+                {
+                    this.messageEncoder = messageEncoder;
+                }
+
+                public override string ContentType
+                {
+                    get { return this.messageEncoder.ContentType; }
+                }
+
+                public override string MediaType
+                {
+                    get { return this.messageEncoder.MediaType; }
+                }
+
+                public override MessageVersion MessageVersion
+                {
+                    get { return this.messageEncoder.MessageVersion; }
+                }
+
+                public override bool IsContentTypeSupported(string contentType)
+                {
+                    return this.messageEncoder.IsContentTypeSupported(contentType);
+                }
+
+                public override Message ReadMessage(ArraySegment<byte> buffer, BufferManager bufferManager, string contentType)
+                {
+                    MemoryStream ms = new MemoryStream();
+                    const string hex = "0123456789abcdef";
+                    for (int i = 0; i < buffer.Count; i++)
+                    {
+                        byte b = buffer.Array[buffer.Offset + i];
+                        if (b < 0x20)
+                        {
+                            ms.WriteByte((byte)'&');
+                            ms.WriteByte((byte)'#');
+                            ms.WriteByte((byte)'x');
+                            if (b >= 0x10)
+                            {
+                                ms.WriteByte((byte)'1');
+                            }
+
+                            ms.WriteByte((byte)hex[b & 0x0F]);
+                            ms.WriteByte((byte)';');
+                        }
+                        else
+                        {
+                            ms.WriteByte(b);
+                        }
+                    }
+
+                    int newSize = (int)ms.Position;
+                    byte[] newBuffer = bufferManager.TakeBuffer(newSize + buffer.Offset);
+                    Array.Copy(buffer.Array, 0, newBuffer, 0, buffer.Offset);
+                    Array.Copy(ms.GetBuffer(), 0, newBuffer, buffer.Offset, newSize);
+                    ArraySegment<byte> temp = new ArraySegment<byte>(newBuffer, buffer.Offset, newSize);
+                    bufferManager.ReturnBuffer(buffer.Array);
+
+                    return this.messageEncoder.ReadMessage(temp, bufferManager, contentType);
+                }
+
+                public override Message ReadMessage(Stream stream, int maxSizeOfHeaders, string contentType)
+                {
+                    throw new NotSupportedException("Streamed not supported");
+                }
+
+                public override ArraySegment<byte> WriteMessage(Message message, int maxMessageSize, BufferManager bufferManager, int messageOffset)
+                {
+                    return this.messageEncoder.WriteMessage(message, maxMessageSize, bufferManager, messageOffset);
+                }
+
+                public override void WriteMessage(Message message, Stream stream)
+                {
+                    throw new NotSupportedException("Streamed not supported");
+                }
+            }
+
+            class AddBodyNamespacesBodyWriter : BodyWriter
+            {
+                Dictionary<string, string> prefixToNamespaceMapping;
+                XmlDictionaryReader bodyReader;
+                public AddBodyNamespacesBodyWriter(Dictionary<string, string> prefixToNamespaceMapping, XmlDictionaryReader bodyReader)
+                    : base(true)
+                {
+                    this.prefixToNamespaceMapping = prefixToNamespaceMapping;
+                    this.bodyReader = bodyReader;
+                }
+
+                protected override void OnWriteBodyContents(XmlDictionaryWriter writer)
+                {
+                    foreach (var prefix in this.prefixToNamespaceMapping.Keys)
+                    {
+                        writer.WriteAttributeString("xmlns", prefix, null, this.prefixToNamespaceMapping[prefix]);
+                    }
+
+                    writer.WriteNode(this.bodyReader, false);
+                }
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+
+            // Real service
+            //ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            //host.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding(), "");
+
+            // Simulated service which returns '00'
+            WebServiceHost host = new WebServiceHost(typeof(SimulatedService), new Uri(baseAddress));
+
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            // Real service
+            //string endpointAddress = baseAddress;
+
+            // Simulated service
+            string endpointAddress = baseAddress + "/GetData";
+
+            CustomBinding binding = ReplaceInvalidXmlCharsEncodingBindingElement.ReplaceEncodingBindingElement(
+                new BasicHttpBinding());
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(binding, new EndpointAddress(endpointAddress));
+            ITest proxy = factory.CreateChannel();
+            string result = string.Join(" ",
+                proxy.GetData()
+                    .Select(c => string.Format("{0:X2}", (int)c)));
+            Console.WriteLine(result);
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/9997163
+    public class StackOverflow_9997163
+    {
+        [ServiceContract]
+        public class Service
+        {
+            private int increment;
+            public Service(int increment)
+            {
+                this.increment = increment;
+            }
+            [WebGet]
+            public int Add(int x, int y)
+            {
+                return x + y + increment;
+            }
+        }
+        class MyInstanceProvider : IInstanceProvider
+        {
+            Func<Service> serviceCreator;
+            public MyInstanceProvider(Func<Service> serviceCreator)
+            {
+                this.serviceCreator = serviceCreator;
+            }
+
+            public object GetInstance(InstanceContext instanceContext, Message message)
+            {
+                return this.serviceCreator();
+            }
+
+            public object GetInstance(InstanceContext instanceContext)
+            {
+                return this.serviceCreator();
+            }
+
+            public void ReleaseInstance(InstanceContext instanceContext, object instance)
+            {
+            }
+        }
+        class MyServiceBehavior : IServiceBehavior
+        {
+            Func<Service> serviceCreator;
+            public MyServiceBehavior(Func<Service> serviceCreator)
+            {
+                this.serviceCreator = serviceCreator;
+            }
+
+            public void AddBindingParameters(ServiceDescription serviceDescription, ServiceHostBase serviceHostBase, Collection<ServiceEndpoint> endpoints, BindingParameterCollection bindingParameters)
+            {
+            }
+
+            public void ApplyDispatchBehavior(ServiceDescription serviceDescription, ServiceHostBase serviceHostBase)
+            {
+                foreach (ChannelDispatcher cd in serviceHostBase.ChannelDispatchers)
+                {
+                    foreach (EndpointDispatcher ed in cd.Endpoints)
+                    {
+                        ed.DispatchRuntime.InstanceProvider = new MyInstanceProvider(this.serviceCreator);
+                    }
+                }
+            }
+
+            public void Validate(ServiceDescription serviceDescription, ServiceHostBase serviceHostBase)
+            {
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            int currentIncrement = 1;
+            host.Description.Behaviors.Add(new MyServiceBehavior(delegate()
+            {
+                return new Service(currentIncrement++);
+            }));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            for (int i = 0; i < 10; i++)
+            {
+                WebClient c = new WebClient();
+                Console.WriteLine(c.DownloadString(baseAddress + "/Add?x=6&y=8"));
+            }
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/10232385/751090
+    public class StackOverflow_10232385
+    {
+        public class MyCustomBehavior : IEndpointBehavior
+        {
+            public void AddBindingParameters(ServiceEndpoint endpoint, BindingParameterCollection bindingParameters)
+            {
+                Console.WriteLine("In {0}.{1}", this.GetType().Name, MethodBase.GetCurrentMethod().Name);
+            }
+
+            public void ApplyClientBehavior(ServiceEndpoint endpoint, ClientRuntime clientRuntime)
+            {
+                Console.WriteLine("In {0}.{1}", this.GetType().Name, MethodBase.GetCurrentMethod().Name);
+            }
+
+            public void ApplyDispatchBehavior(ServiceEndpoint endpoint, EndpointDispatcher endpointDispatcher)
+            {
+                Console.WriteLine("In {0}.{1}", this.GetType().Name, MethodBase.GetCurrentMethod().Name);
+            }
+
+            public void Validate(ServiceEndpoint endpoint)
+            {
+                Console.WriteLine("In {0}.{1}", this.GetType().Name, MethodBase.GetCurrentMethod().Name);
+            }
+        }
+
+        public class MyCustomBehaviorExtension : BehaviorExtensionElement
+        {
+            public override Type BehaviorType
+            {
+                get { return typeof(MyCustomBehavior); }
+            }
+
+            protected override object CreateBehavior()
+            {
+                return new MyCustomBehavior();
+            }
+        }
+
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string Echo(string text);
+        }
+        public class Service : ITest
+        {
+            public string Echo(string text)
+            {
+                return text;
+            }
+        }
+
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            ServiceEndpoint endpoint = host.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding(), "");
+
+            var configuration = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
+            ServiceModelSectionGroup smsg = configuration.GetSectionGroup("system.serviceModel") as ServiceModelSectionGroup;
+            EndpointBehaviorElement endpointBehaviorElement = smsg.Behaviors.EndpointBehaviors["MyCustomBehavior_10232385"];
+            foreach (BehaviorExtensionElement behaviorElement in endpointBehaviorElement)
+            {
+                MethodInfo createBehaviorMethod = behaviorElement.GetType().GetMethod("CreateBehavior", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public, null, Type.EmptyTypes, null);
+                IEndpointBehavior behavior = createBehaviorMethod.Invoke(behaviorElement, new object[0]) as IEndpointBehavior;
+                endpoint.Behaviors.Add(behavior);
+            }
+
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(new BasicHttpBinding(), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+            Console.WriteLine(proxy.Echo("Hello"));
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            MyCode_9.Test();
+            StackOverflow_10232385.Test();
         }
     }
 }
