@@ -1,0 +1,3 @@
+﻿<%@ ServiceHost Language="C#" Debug="true" Service="StackOverflow_10721469.PSRestService"
+                CodeBehind="StackOverflow_10721469.svc.cs" 
+                Factory="StackOverflow_10721469.PSRestServiceFactory" %>
