@@ -6,6 +6,20 @@
 </head>
 <body>
     <script type="text/javascript">
+        function StackOverflow_11090835_Test() {
+            var url = "/StackOverflow_11090835.svc/ReturnData";
+            var data = { s: "Hello world" };
+            $.ajax({
+                type: 'GET',
+                url: url,
+                data: data,
+                dataType: "jsonp",
+                success: function (result) {
+                    $("#result").text(result.Status);
+                }
+            });
+        }
+
         function StackOverflow_10721469_Test() {
             var url = "/StackOverflow_10721469.svc/blockActivityTrans";
             $.ajax({
@@ -124,6 +138,7 @@
     </script>
     <input type="button" value="StackOverflow 8537634" onclick="StackOverflow_8537634_Test();" /> <br />
     <input type="button" value="StackOverflow 10721469" onclick="StackOverflow_10721469_Test();" /> <br />
+    <input type="button" value="StackOverflow 11090835" onclick="StackOverflow_11090835_Test();" /><br />
     <input type="button" value="MSDN ca5941b4-bfcf-4546-a418-cc91a321c2fb - Basic" onclick="Post_ca5941b4_bfcf_4546_a418_cc91a321c2fb_Basic();" /><br />
     <input type="button" value="MSDN ca5941b4-bfcf-4546-a418-cc91a321c2fb - WS" onclick="Post_ca5941b4_bfcf_4546_a418_cc91a321c2fb_WS();" /><br />
     <input type="button" value="MSDN a72c9431-ce05-43c7-be9e-4aa514c842d7 - Normal" onclick="Post_a72c9431_ce05_43c7_be9e_4aa514c842d7(false);" /><br />

@@ -62,6 +62,7 @@
     <Content Include="Post_ca5941b4_bfcf_4546_a418_cc91a321c2fb.svc" />
     <Content Include="scripts\jquery-1.7.2.js" />
     <Content Include="StackOverflow_10721469.svc" />
+    <Content Include="StackOverflow_11090835.svc" />
     <Content Include="StackOverflow_8537634.svc" />
     <Content Include="Web.config">
       <SubType>Designer</SubType>
