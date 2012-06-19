@@ -2,10 +2,32 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <title>Quick template</title>
+    <link href="scripts/themes/ui-lightness/jquery-ui.css" rel="Stylesheet" type="text/css" />
     <script type="text/javascript" src="scripts/jquery-1.7.2.js"></script>
+    <script type="text/javascript" src="scripts/jquery-ui-1.8.20.js"></script>
+    <script type="text/javascript" src="scripts/json2.js"></script>
 </head>
 <body>
     <script type="text/javascript">
+        function StackOverflow_11105856_Test() {
+            var url = "/StackOverflow_11105856.svc/UpdateEmployee";
+            var data = {
+                Name: "John Doe",
+                Department: "Accounting",
+                Salary: 50000,
+                Hired: $("#StackOverflow_11105856_datepicker").val()
+            };
+            $.ajax({
+                type: 'POST',
+                url: url,
+                contentType: "application/json",
+                data: JSON.stringify({ Employee: data }),
+                success: function (result) {
+                    $("#result").text(result.UpdateEmployeeResult);
+                }
+            });
+        }
+
         function StackOverflow_11090835_Test() {
             var url = "/StackOverflow_11090835.svc/ReturnData";
             var data = { s: "Hello world" };
@@ -139,6 +161,7 @@
     <input type="button" value="StackOverflow 8537634" onclick="StackOverflow_8537634_Test();" /> <br />
     <input type="button" value="StackOverflow 10721469" onclick="StackOverflow_10721469_Test();" /> <br />
     <input type="button" value="StackOverflow 11090835" onclick="StackOverflow_11090835_Test();" /><br />
+    <input id="StackOverflow_11105856_datepicker" type="text" /> <input type="button" value="StackOverflow 11105856" onclick="StackOverflow_11105856_Test();" /><br />
     <input type="button" value="MSDN ca5941b4-bfcf-4546-a418-cc91a321c2fb - Basic" onclick="Post_ca5941b4_bfcf_4546_a418_cc91a321c2fb_Basic();" /><br />
     <input type="button" value="MSDN ca5941b4-bfcf-4546-a418-cc91a321c2fb - WS" onclick="Post_ca5941b4_bfcf_4546_a418_cc91a321c2fb_WS();" /><br />
     <input type="button" value="MSDN a72c9431-ce05-43c7-be9e-4aa514c842d7 - Normal" onclick="Post_a72c9431_ce05_43c7_be9e_4aa514c842d7(false);" /><br />
@@ -146,5 +169,10 @@
     <img alt="image1" src="images/1.png" id="imageButton1" onclick="SO_10463359_SwapButtons(false);" style="border: 2; visibility: visible;" />
     <img alt="image2" src="images/2.png" id="imageButton2" onclick="SO_10463359_SwapButtons(true);" style="border: 2; visibility: hidden;" /><br />
     <div id='result'></div>
+
+    <script type="text/javascript">
+        // Initialization
+        $("#StackOverflow_11105856_datepicker").datepicker();
+    </script>
 </body>
 </html>
