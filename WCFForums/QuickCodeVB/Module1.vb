@@ -1037,11 +1037,36 @@ Public Class Post_4c22e180_cebd_4a5b_9d9f_5055469a7d94
 
 End Class
 
+' http://stackoverflow.com/q/10554490/751090
+Public Class StackOverflow_10554490
+    <CollectionDataContract(Name:="listaActos", Namespace:="http://my.namespace", ItemName:="codigoActo")> _
+    Public Class listaActos
+        Inherits List(Of String)
+    End Class
+
+    <DataContract(Name:="Root", Namespace:="http://my.namespace")> _
+    Public Class Root
+        <DataMember()> _
+        Public Property listaActos As listaActos
+    End Class
+
+    Public Shared Sub Test()
+        Dim list As listaActos = New listaActos()
+        list.Add("01672")
+        list.Add("01673")
+        list.Add("01674")
+        Dim root = New Root With {.listaActos = list}
+        Dim dcs = New DataContractSerializer(GetType(Root))
+        Dim ms = New MemoryStream()
+        dcs.WriteObject(ms, root)
+        Console.WriteLine(Encoding.UTF8.GetString(ms.ToArray()))
+    End Sub
+End Class
 
 Module Module1
 
     Sub Main()
-        Post_4c22e180_cebd_4a5b_9d9f_5055469a7d94.Test()
+        StackOverflow_10554490.Test()
     End Sub
 
 End Module
