@@ -1063,6 +1063,81 @@ Public Class StackOverflow_10554490
     End Sub
 End Class
 
+Public Class Post_98b7a23b_9096_400d_84f1_8c20447cfcac
+
+    <DataContract([Namespace]:="")> _
+    Public Class ItemTrackingDetail
+        Private strItemNumber As String
+        <DataMember(Order:=0)> _
+        Public Property ItemNumber() As String
+            Get
+                Return strItemNumber
+            End Get
+            Set(ByVal value As String)
+                strItemNumber = value
+            End Set
+        End Property
+        Private strSecondaryItemNumber As String
+        <DataMember(Order:=1)> _
+        Public Property SecondaryItemNumber() As String
+            Get
+                Return strSecondaryItemNumber
+            End Get
+            Set(ByVal value As String)
+                strSecondaryItemNumber = value
+            End Set
+        End Property
+    End Class
+
+    <CollectionDataContract([Namespace]:="", Name:="ItemTrackingDetails", ItemName:="ItemTrackingDetail")> _
+    Public Class ItemTrackingDetailsRes
+        Inherits List(Of ItemTrackingDetail)
+        Public Sub New()
+        End Sub
+    End Class
+
+    <DataContract([Namespace]:="http://www.url.com/test")> _
+    Public Class ItemTrackingDetailsReq
+        <DataMember()> _
+        Public ItemNumber As String
+    End Class
+
+    <ServiceContract()> _
+    Public Interface IItemTrackerService
+        <OperationContract()> _
+        <WebInvoke(Method:="POST", RequestFormat:=WebMessageFormat.Xml, ResponseFormat:=WebMessageFormat.Xml, BodyStyle:=WebMessageBodyStyle.WrappedRequest, UriTemplate:="GetItemTrackingDetails")> _
+        Function GetItemTrackingDetails(ByVal rData As ItemTrackingDetailsReq) As ItemTrackingDetailsRes
+    End Interface
+
+    Public Class Service
+        Implements IItemTrackerService
+
+        Public Function GetItemTrackingDetails(rData As ItemTrackingDetailsReq) As ItemTrackingDetailsRes Implements IItemTrackerService.GetItemTrackingDetails
+            Dim result = New ItemTrackingDetailsRes
+            result.Add(New ItemTrackingDetail With {.ItemNumber = "A10001", .SecondaryItemNumber = "B10001"})
+            result.Add(New ItemTrackingDetail With {.ItemNumber = "A10002", .SecondaryItemNumber = "B10002"})
+            Return result
+        End Function
+    End Class
+
+    Public Shared Sub Test()
+        Dim baseAddress As String = "http://" + Environment.MachineName + ":8000/Service"
+        Dim host As ServiceHost = New ServiceHost(GetType(Service), New Uri(baseAddress))
+        host.AddServiceEndpoint(GetType(IItemTrackerService), New WebHttpBinding(), "").Behaviors.Add(New WebHttpBehavior())
+        host.Open()
+        Console.WriteLine("Host opened")
+
+        Dim factory = New ChannelFactory(Of IItemTrackerService)(New WebHttpBinding(), New EndpointAddress(baseAddress))
+        factory.Endpoint.Behaviors.Add(New WebHttpBehavior())
+        Dim proxy = factory.CreateChannel()
+        Console.WriteLine(proxy.GetItemTrackingDetails(New ItemTrackingDetailsReq With {.ItemNumber = "A10001"}))
+
+        CType(proxy, IClientChannel).Close()
+        factory.Close()
+        host.Close()
+    End Sub
+End Class
+
 Module Module1
 
     Sub Main()

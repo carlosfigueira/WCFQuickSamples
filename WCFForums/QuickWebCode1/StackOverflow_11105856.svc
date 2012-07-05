@@ -1,0 +1,2 @@
+﻿<%@ ServiceHost Language="C#" Debug="true" Service="StackOverflow_11105856.Service" CodeBehind="StackOverflow_11105856.svc.cs"
+                Factory="System.ServiceModel.Activation.WebServiceHostFactory" %>

@@ -1,0 +1,23 @@
+﻿<%@ ServiceHost Language="C#" Debug="true" Service="StackOverflow_11090835.Service"
+                Factory="System.ServiceModel.Activation.WebServiceHostFactory" %>
+
+using System;
+using System.IO;
+using System.ServiceModel;
+using System.ServiceModel.Web;
+using System.Text;
+
+namespace StackOverflow_11090835
+{
+    [ServiceContract]
+    public class Service
+    {
+        [WebGet(UriTemplate = "ReturnData?s={s}&callback={callbackFunctionName}")]
+        public Stream EchoWithGet(string s, string callbackFunctionName)
+        {
+            string jsCode = callbackFunctionName + "({\"Status\":\"OK\"});";
+            WebOperationContext.Current.OutgoingResponse.ContentType = "application/javascript";
+            return new MemoryStream(Encoding.UTF8.GetBytes(jsCode));
+        }
+    }
+}

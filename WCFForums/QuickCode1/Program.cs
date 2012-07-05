@@ -39,6 +39,11 @@ using System.Xml.Linq;
 using System.Xml.Schema;
 using System.Xml.Serialization;
 using UtilCS;
+using System.Numerics;
+using System.Web.Script.Serialization;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.Collections;
 
 namespace QuickCode1
 {
@@ -12392,7 +12397,7 @@ namespace QuickCode1
                 this.inner.WriteStartElement(prefix, localName, ns);
             }
 
-            public override WriteState WriteState
+            public override System.Xml.WriteState WriteState
             {
                 get { return this.inner.WriteState; }
             }
@@ -20270,11 +20275,779 @@ namespace QuickCode1
         }
     }
 
+    public class Post_45883b7e_1d13_4b81_82d8_054364839d0d
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string Echo(string text);
+        }
+
+        public static void Test()
+        {
+            Console.WriteLine(AppDomain.CurrentDomain.SetupInformation.ConfigurationFile);
+            ClientSection clientSection = ConfigurationManager.GetSection("system.serviceModel/client") as ClientSection;
+            //var configuration = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
+            //ServiceModelSectionGroup smsg = configuration.GetSectionGroup("system.serviceModel") as ServiceModelSectionGroup;
+            //ClientSection clientSection = smsg.Client;
+            Console.WriteLine("# of endpoints in client section: {0}", clientSection.Endpoints.Count);
+            foreach (ChannelEndpointElement endpoint in clientSection.Endpoints)
+            {
+                Console.WriteLine("  Name: {0}", endpoint.Name);
+                Console.WriteLine("  - Address: {0}", endpoint.Address);
+                Console.WriteLine("  - Binding: {0}", endpoint.Binding);
+                Console.WriteLine("  - Contract: {0}", endpoint.Contract);
+            }
+        }
+    }
+
+    // http://stackoverflow.com/q/10388746
+    public class StackOverflow_10388746
+    {
+        [ServiceContract]
+        public interface ICalculator
+        {
+            [WebGet]
+            int Add(int x, int y);
+            [WebInvoke(BodyStyle = WebMessageBodyStyle.WrappedRequest)]
+            int Subtract(int x, int y);
+        }
+        public class Service : ICalculator
+        {
+            public int Add(int x, int y)
+            {
+                PrintHeaders("Add");
+                return x + y;
+            }
+            public int Subtract(int x, int y)
+            {
+                PrintHeaders("Subtract");
+                return x - y;
+            }
+            void PrintHeaders(string operation)
+            {
+                Console.WriteLine("Incoming HTTP headers for operation '{0}'", operation);
+                foreach (var header in WebOperationContext.Current.IncomingRequest.Headers.AllKeys)
+                {
+                    Console.WriteLine("  {0}: {1}", header, WebOperationContext.Current.IncomingRequest.Headers[header]);
+                }
+            }
+        }
+        public class MyWebClient : ClientBase<ICalculator>, ICalculator
+        {
+            Dictionary<string, string> outgoingHeaders = new Dictionary<string, string>();
+
+            public MyWebClient(Uri baseAddress)
+                : base(new WebHttpBinding(), new EndpointAddress(baseAddress))
+            {
+                this.Endpoint.Behaviors.Add(new WebHttpBehavior());
+            }
+
+            #region ICalculator Members
+
+            public int Add(int x, int y)
+            {
+                using (new OperationContextScope(this.InnerChannel))
+                {
+                    foreach (var headerName in this.outgoingHeaders.Keys)
+                    {
+                        WebOperationContext.Current.OutgoingRequest.Headers.Add(headerName, this.outgoingHeaders[headerName]);
+                    }
+
+                    this.outgoingHeaders.Clear();
+                    return this.Channel.Add(x, y);
+                }
+            }
+
+            public int Subtract(int x, int y)
+            {
+                using (new OperationContextScope(this.InnerChannel))
+                {
+                    foreach (var headerName in this.outgoingHeaders.Keys)
+                    {
+                        WebOperationContext.Current.OutgoingRequest.Headers.Add(headerName, this.outgoingHeaders[headerName]);
+                    }
+
+                    this.outgoingHeaders.Clear();
+                    return this.Channel.Subtract(x, y);
+                }
+            }
+
+            #endregion
+
+            public void AddOutgoingHeader(string name, string value)
+            {
+                this.outgoingHeaders.Add(name, value);
+            }
+        }
+
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebChannelFactory<ICalculator> factory = new WebChannelFactory<ICalculator>(new Uri(baseAddress));
+            ICalculator proxy = factory.CreateChannel();
+            using (new OperationContextScope((IContextChannel)proxy))
+            {
+                WebOperationContext.Current.OutgoingRequest.Headers.Add("referer", "http://stackoverflow.com");
+                WebOperationContext.Current.OutgoingRequest.Headers.Add("user-agent", "Mozilla/5.0");
+                Console.WriteLine("Add: {0}", proxy.Add(33, 55));
+                Console.WriteLine();
+            }
+
+            using (new OperationContextScope((IContextChannel)proxy))
+            {
+                WebOperationContext.Current.OutgoingRequest.Headers.Add("referer", "http://stackoverflow.com");
+                WebOperationContext.Current.OutgoingRequest.Headers.Add("user-agent", "Mozilla/5.0");
+                Console.WriteLine("Subtract: {0}", proxy.Subtract(44, 33));
+                Console.WriteLine();
+            }
+
+            MyWebClient client = new MyWebClient(new Uri(baseAddress));
+            client.AddOutgoingHeader("referer", "http://stackoverflow.com");
+            client.AddOutgoingHeader("user-agent", "Mozilla/5.0");
+            Console.WriteLine("Add (via client): {0}", client.Add(44, 77));
+            Console.WriteLine();
+
+            client.AddOutgoingHeader("referer", "http://stackoverflow.com/another");
+            client.AddOutgoingHeader("user-agent", "Mozilla/5.0-b");
+            Console.WriteLine("Add (via client): {0}", client.Subtract(44, 77));
+            Console.WriteLine();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class StackOverflow_10422764
+    {
+        [DataContract(Name = "Person", Namespace = "")]
+        public class Person
+        {
+            [DataMember]
+            public string Name { get; set; }
+            [DataMember]
+            public int Age { get; set; }
+        }
+        [ServiceContract]
+        public class Service
+        {
+            [WebGet(UriTemplate = "/NoQueryParams")]
+            public Person GetPerson()
+            {
+                string format = WebOperationContext.Current.IncomingRequest.UriTemplateMatch.QueryParameters["format"];
+                if (format == "xml")
+                {
+                    WebOperationContext.Current.OutgoingResponse.Format = WebMessageFormat.Xml;
+                }
+                else if (format == "json")
+                {
+                    WebOperationContext.Current.OutgoingResponse.Format = WebMessageFormat.Json;
+                }
+
+                return new Person { Name = "Scooby Doo", Age = 10 };
+            }
+
+            [WebGet(UriTemplate = "/TwoQueryParam?x={x}&y={y}")]
+            public int Add(int x, int y)
+            {
+                return x + y;
+            }
+        }
+        public class MyForceQueryMatchBehavior : IEndpointBehavior, IDispatchMessageInspector
+        {
+            #region IEndpointBehavior Members
+
+            public void AddBindingParameters(ServiceEndpoint endpoint, BindingParameterCollection bindingParameters)
+            {
+            }
+
+            public void ApplyClientBehavior(ServiceEndpoint endpoint, ClientRuntime clientRuntime)
+            {
+            }
+
+            public void ApplyDispatchBehavior(ServiceEndpoint endpoint, EndpointDispatcher endpointDispatcher)
+            {
+                endpointDispatcher.DispatchRuntime.MessageInspectors.Add(this);
+            }
+
+            public void Validate(ServiceEndpoint endpoint)
+            {
+            }
+
+            #endregion
+
+            #region IDispatchMessageInspector Members
+
+            public object AfterReceiveRequest(ref Message request, IClientChannel channel, InstanceContext instanceContext)
+            {
+                UriTemplateMatch uriTemplateMatch = (UriTemplateMatch)request.Properties["UriTemplateMatchResults"];
+
+                List<string> uriTemplateQueryVariables = uriTemplateMatch.Template.QueryValueVariableNames.Select(x => x.ToLowerInvariant()).ToList();
+                List<string> requestQueryVariables = uriTemplateMatch.QueryParameters.Keys.OfType<string>().Select(x => x.ToLowerInvariant()).ToList();
+                if (uriTemplateQueryVariables.Count != requestQueryVariables.Count || uriTemplateQueryVariables.Except(requestQueryVariables).Count() > 0)
+                {
+                    throw new WebFaultException(HttpStatusCode.NotFound);
+                }
+
+                return null;
+            }
+
+            public void BeforeSendReply(ref Message reply, object correlationState)
+            {
+            }
+
+            #endregion
+        }
+        static void SendRequest(string uri)
+        {
+            Console.WriteLine("Request to {0}", uri);
+            WebClient c = new WebClient();
+            try
+            {
+                Console.WriteLine("  {0}", c.DownloadString(uri));
+            }
+            catch (WebException e)
+            {
+                HttpWebResponse resp = e.Response as HttpWebResponse;
+                Console.WriteLine("  ERROR => {0}", resp.StatusCode);
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            ServiceEndpoint endpoint = host.AddServiceEndpoint(typeof(Service), new WebHttpBinding(), "");
+            endpoint.Behaviors.Add(new WebHttpBehavior());
+            endpoint.Behaviors.Add(new MyForceQueryMatchBehavior());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            SendRequest(baseAddress + "/NoQueryParams");
+            SendRequest(baseAddress + "/NoQueryParams?format=json");
+            SendRequest(baseAddress + "/TwoQueryParam?x=7&y=9&z=other");
+            SendRequest(baseAddress + "/TwoQueryParam?x=7&y=9");
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    //http://stackoverflow.com/q/10523009/751090
+    public class StackOverflow_10523009
+    {
+        public class MyClass : IXmlSerializable
+        {
+            public Complex[] ComplexNumbers;
+
+            public XmlSchema GetSchema()
+            {
+                return null;
+            }
+
+            public void ReadXml(XmlReader reader)
+            {
+                reader.ReadStartElement("MyClass");
+                List<Complex> numbers = new List<Complex>();
+                while (reader.IsStartElement("Complex"))
+                {
+                    Complex c = new Complex(
+                        double.Parse(reader.GetAttribute("Real")),
+                        double.Parse(reader.GetAttribute("Imaginary")));
+                    numbers.Add(c);
+                    reader.Skip();
+                }
+
+                reader.ReadEndElement();
+                this.ComplexNumbers = numbers.ToArray();
+            }
+
+            public void WriteXml(XmlWriter writer)
+            {
+                foreach (var complex in ComplexNumbers)
+                {
+                    writer.WriteStartElement("Complex");
+                    writer.WriteStartAttribute("Real"); writer.WriteValue(complex.Real); writer.WriteEndAttribute();
+                    writer.WriteStartAttribute("Imaginary"); writer.WriteValue(complex.Imaginary); writer.WriteEndAttribute();
+                    writer.WriteEndElement();
+                }
+            }
+
+            public override string ToString()
+            {
+                return "MyClass[" + string.Join(",", ComplexNumbers) + "]";
+            }
+        }
+        public static void Test()
+        {
+            MyClass mc = new MyClass { ComplexNumbers = new Complex[] { new Complex(3, 4), new Complex(0, 1), new Complex(1, 0) } };
+            XmlSerializer xs = new XmlSerializer(typeof(MyClass));
+            MemoryStream ms = new MemoryStream();
+            xs.Serialize(ms, mc);
+            Console.WriteLine(Encoding.UTF8.GetString(ms.ToArray()));
+            ms.Position = 0;
+            MyClass mc2 = (MyClass)xs.Deserialize(ms);
+            Console.WriteLine(mc2);
+        }
+    }
+
+    // http://stackoverflow.com/q/10524470/751090
+    public class StackOverflow_10524470
+    {
+        public class Animal
+        {
+            [XmlText]
+            public string Name { get; set; }
+        }
+        public class Dog : Animal { }
+        public class Cat : Animal { }
+        public class Frog : Animal { }
+        public class Root
+        {
+            [XmlElementAttribute(Order = 4, ElementName = "animals")]
+            public Animals animals;
+        }
+        public class Animals
+        {
+            [XmlElementAttribute(Order = 4)]
+            [XmlElement("Frog", typeof(Frog))]
+            [XmlElement("Cat", typeof(Cat))]
+            [XmlElement("Dog", typeof(Dog))]
+            public List<Animal> lines = new List<Animal>();
+        }
+        public static void Test()
+        {
+            MemoryStream ms = new MemoryStream();
+            XmlSerializer xs = new XmlSerializer(typeof(Root));
+            Root root = new Root
+            {
+                animals = new Animals
+                {
+                    lines = new List<Animal> 
+                    { 
+                        new Dog { Name = "Fido" },
+                        new Cat { Name = "Fluffy" },
+                        new Frog { Name = "Singer" },
+                    }
+                }
+            };
+            xs.Serialize(ms, root);
+            Console.WriteLine(Encoding.UTF8.GetString(ms.ToArray()));
+        }
+    }
+
+    // http://stackoverflow.com/q/10543252/751090
+    public class StackOverflow_10543252
+    {
+        public static void Test()
+        {
+            byte[] bytes = Enumerable.Range(0, 256).Select(i => (byte)i).ToArray();
+            File.WriteAllBytes("a.bin", bytes);
+            FileStream fs1 = File.OpenRead("a.bin");
+            fs1.Seek(40, SeekOrigin.Begin);
+            FileStream fs2 = File.OpenRead("a.bin");
+            fs2.Seek(120, SeekOrigin.Begin);
+            Console.WriteLine(fs1.ReadByte()); // should be 40
+            Console.WriteLine(fs2.ReadByte()); // should be 120
+            fs1.Close();
+            fs2.Close();
+            File.Delete("a.bin");
+        }
+    }
+
+    // http://stackoverflow.com/q/10608188/751090
+    public class StackOverflow_10608188
+    {
+        public static void Test()
+        {
+            string json = @"{""response"":{
+              ""a"" : ""value of a"",
+              ""b"" : ""value of b"",
+              ""c"" : ""value of c""
+            }}";
+            JObject jo = JObject.Parse(json);
+            foreach (JProperty property in jo["response"].Children())
+            {
+                Console.WriteLine(property.Value);
+            }
+        }
+    }
+
+    // http://stackoverflow.com/q/10622765/751090
+    public class StackOverflow_10622765
+    {
+        public static void Test()
+        {
+            string json = @"{
+      ""adult"": false,
+      ""backdrop_path"": ""/mOTtuakUTb1qY6jG6lzMfjdhLwc.jpg"",
+      ""belongs_to_collection"": {
+      ""backdrop_path"": ""/mOTtuakUTb1qY6jG6lzMfjdhLwc.jpg"",
+      ""id"": 10,
+      ""name"": ""Star Wars Collection"",
+      ""poster_path"": ""/6rddZZpxMQkGlpQYVVxb2LdQRI3.jpg""
+      },
+      ""budget"": 11000000,
+      ""genres"": [{
+          ""id"": 28,
+          ""name"": ""Action""
+      },
+      {
+      ""id"": 14,
+      ""name"": ""Fantasy""
+      },
+      {
+      ""id"": 878,
+      ""name"": ""Science Fiction""
+      }],
+      ""homepage"": ""http://www.starwars.com"",
+      ""id"": 11,
+      ""imdb_id"": ""tt0076759"",
+      ""original_title"": ""Star Wars: Episode IV: A New Hope"",
+      ""overview"": ""Princess Leia is captured."",
+      ""popularity"": 84.8,
+      ""poster_path"": ""/qoETrQ73Jbd2LDN8EUfNgUerhzG.jpg"",
+       ""production_companies"": [{
+      ""id"": 1,
+      ""name"": ""Lucasfilm""
+      },
+      {
+      ""id"": 8265,
+      ""name"": ""Paramount""
+      }],
+      ""production_countries"": [{
+      ""iso_3166_1"": ""TN"",
+      ""name"": ""Tunisia""
+      },
+      {
+      ""iso_3166_1"": ""US"",
+      ""name"": ""United States of America""
+      }],
+      ""release_date"": ""1977-12-27"",
+      ""revenue"": 775398007,
+      ""runtime"": 121,
+      ""spoken_languages"": [{
+      ""iso_639_1"": ""en"",
+      ""name"": ""English""
+      }],
+      ""tagline"": ""A long time ago in a galaxy far, far away..."",
+      ""title"": ""Star Wars: Episode IV: A New Hope"",
+      ""vote_average"": 8.8,
+      ""vote_count"": 75
+      }";
+            JObject jo = JObject.Parse(json);
+            Console.WriteLine(jo);
+        }
+    }
+
+    // http://stackoverflow.com/q/10644465/751090
+    public class StackOverflow_10644465
+    {
+        private sealed class DynamicJsonConverter : JavaScriptConverter
+        {
+            public override object Deserialize(IDictionary<string, object> dictionary, Type type, JavaScriptSerializer serializer)
+            {
+                if (dictionary == null)
+                    throw new ArgumentNullException("dictionary");
+
+                return type == typeof(object) ? new DynamicJsonObject(dictionary) : null;
+            }
+
+            public override IDictionary<string, object> Serialize(object obj, JavaScriptSerializer serializer)
+            {
+                throw new NotImplementedException();
+            }
+
+            public override IEnumerable<Type> SupportedTypes
+            {
+                get { return new ReadOnlyCollection<Type>(new List<Type>(new[] { typeof(object) })); }
+            }
+
+            #region Nested type: DynamicJsonObject
+
+            private sealed class DynamicJsonObject : DynamicObject
+            {
+                private readonly IDictionary<string, object> _dictionary;
+
+                public DynamicJsonObject(IDictionary<string, object> dictionary)
+                {
+                    if (dictionary == null)
+                        throw new ArgumentNullException("dictionary");
+                    _dictionary = dictionary;
+                }
+
+                public override string ToString()
+                {
+                    var sb = new StringBuilder("{");
+                    ToString(sb);
+                    return sb.ToString();
+                }
+
+                private void ToString(StringBuilder sb)
+                {
+                    var firstInDictionary = true;
+                    foreach (var pair in _dictionary)
+                    {
+                        if (!firstInDictionary)
+                            sb.Append(",");
+                        firstInDictionary = false;
+                        var value = pair.Value;
+                        var name = pair.Key;
+                        if (value is string)
+                        {
+                            sb.AppendFormat("{0}:\"{1}\"", name, value);
+                        }
+                        else if (value is IDictionary<string, object>)
+                        {
+                            new DynamicJsonObject((IDictionary<string, object>)value).ToString(sb);
+                        }
+                        else if (value is ArrayList)
+                        {
+                            sb.Append(name + ":[");
+                            var firstInArray = true;
+                            foreach (var arrayValue in (ArrayList)value)
+                            {
+                                if (!firstInArray)
+                                    sb.Append(",");
+                                firstInArray = false;
+                                if (arrayValue is IDictionary<string, object>)
+                                    new DynamicJsonObject((IDictionary<string, object>)arrayValue).ToString(sb);
+                                else if (arrayValue is string)
+                                    sb.AppendFormat("\"{0}\"", arrayValue);
+                                else
+                                    sb.AppendFormat("{0}", arrayValue);
+
+                            }
+                            sb.Append("]");
+                        }
+                        else
+                        {
+                            sb.AppendFormat("{0}:{1}", name, value);
+                        }
+                    }
+                    sb.Append("}");
+                }
+
+                public override bool TryGetMember(GetMemberBinder binder, out object result)
+                {
+                    if (!_dictionary.TryGetValue(binder.Name, out result))
+                    {
+                        // return null to avoid exception.  caller can check for null this way...
+                        result = null;
+                        return true;
+                    }
+
+                    var dictionary = result as IDictionary<string, object>;
+                    if (dictionary != null)
+                    {
+                        result = new DynamicJsonObject(dictionary);
+                        return true;
+                    }
+
+                    var arrayList = result as ArrayList;
+                    if (arrayList != null && arrayList.Count > 0)
+                    {
+                        if (arrayList[0] is IDictionary<string, object>)
+                            result = new List<object>(arrayList.Cast<IDictionary<string, object>>().Select(x => new DynamicJsonObject(x)));
+                        else
+                            result = new List<object>(arrayList.Cast<object>());
+                    }
+
+                    return true;
+                }
+
+                public override bool TryInvokeMember(InvokeMemberBinder binder, object[] args, out object result)
+                {
+                    if (binder.Name == "ContainsKey")
+                    {
+                        result = _dictionary.ContainsKey(args[0] as string);
+                        return true;
+                    }
+                    else
+                    {
+                        return base.TryInvokeMember(binder, args, out result);
+                    }
+                }
+            }
+
+            #endregion
+        }
+
+        public static void Test()
+        {
+            string json = @"{
+                ""error"": null,
+                ""statuses"": [{
+                    ""in_reply_to_status_id_str"": null,
+                    ""id_str"": ""203239104421445632"",
+                    ""truncated"": false,
+                    ""possibly_sensitive"": false,
+                    ""created_at"": ""Thu May 17 21:42:33 +0000 2012"",
+                    ""in_reply_to_user_id_str"": null,
+                    ""contributors"": null,
+                    ""favorited"": false,
+                    ""geo"": null,
+                    ""user"": {
+                        ""screen_name"": ""YouthNorrort""
+                    },
+                    ""in_reply_to_screen_name"": null,
+                    ""coordinates"": null,
+                    ""retweet_count"": 0,
+                    ""source"": ""\u003Ca href=\""http:\/\/www.facebook.com\/twitter\"" rel=\""nofollow\""\u003EFacebook\u003C\/a\u003E"",
+                    ""place"": null,
+                    ""in_reply_to_status_id"": null,
+                    ""id"": 203239104421445632,
+                    ""retweeted"": false,
+                    ""in_reply_to_user_id"": null,
+                    ""text"": ""Hejsan igen!\nvi \u00e4r ledsna att meddela er, men inf\u00f6r imorgon s\u00e5 finns det inga bilar, allts\u00e5 inte heller plats f\u00f6r... http:\/\/t.co\/pMKoOz7o"",
+                    ""result_category"": ""recent""
+                },{""something"":""else""}]}";
+            JavaScriptSerializer jss = new JavaScriptSerializer();
+            jss.RegisterConverters(new[] { new DynamicJsonConverter() });
+            dynamic obj = jss.Deserialize(json, typeof(object)) as dynamic;
+
+            foreach (var objects in obj.statuses)
+            {
+                Console.WriteLine(objects.GetType());
+                if (objects.ContainsKey("text"))
+                {
+                    if ((objects.text != null) && (objects.user.screen_name != null) && (objects.id_str != null))
+                    {
+                        Match m = Regex.Match(objects.text, @"(http(s)?://)?([\w-]+\.)+[\w-]+(/\S\w[\w- ;,./?%&=]\S*)?");
+
+                        if (!m.Success)
+                        {
+                            string loggaD = objects.user.screen_name.ToString() + "/" + objects.id_str.ToString();
+                            Console.WriteLine(loggaD);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // http://stackoverflow.com/q/10705733/751090
+    public class StackOverflow_10705733
+    {
+        [CollectionDataContract(Name = "invoices", ItemName = "invoice", Namespace = "")]
+        public class Invoices : List<int>
+        {
+            [DataMember(Name = "invoice")]
+            public int[] InvoiceIds { get; set; }
+        }
+        public static void Test()
+        {
+            DataContractSerializer dcs = new DataContractSerializer(typeof(Invoices));
+            string xml = @"<invoices>
+                              <invoice>2848</invoice>
+                              <invoice>2849</invoice>
+                              <invoice>2850</invoice>
+                              <invoice>2851</invoice>
+                              <invoice>2852</invoice>
+                            </invoices>";
+            MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(xml));
+            Invoices value = dcs.ReadObject(ms) as Invoices;
+            Console.WriteLine(string.Join(",", value));
+        }
+    }
+
+    // http://stackoverflow.com/q/10807173/751090
+    public class StackOverflow_10807173
+    {
+        public static void Test()
+        {
+            XmlDocument doc = new XmlDocument();
+            XmlElement RootElement = (XmlElement)doc.AppendChild(doc.CreateElement("root"));
+            string[] CSV = "hello world how are you".Split(' ');
+            int nodeCount = 0;
+            XmlAttribute xmlnsAttr = doc.CreateAttribute("xmlns", "acp", "http://www.w3.org/2000/xmlns/");
+            string acpNamespace = "http://www.namespace.com";
+            xmlnsAttr.Value = acpNamespace;
+            RootElement.Attributes.Append(xmlnsAttr);
+            foreach (string line in CSV)
+            {
+                XmlElement navPointElement = (XmlElement)RootElement.AppendChild(doc.CreateElement("navPoint"));
+                XmlElement navPointTypeElement = (XmlElement)navPointElement.AppendChild(doc.CreateElement("type", acpNamespace));
+                navPointTypeElement.Prefix = "acp";
+                navPointTypeElement.InnerText = nodeCount == 0 ? "cover" : "article";
+            }
+
+            Console.WriteLine(doc.OuterXml);
+        }
+    }
+
+    // http://stackoverflow.com/q/10970052/751090
+    public class StackOverflow_10970052
+    {
+        [ServiceContract]
+        public class Service
+        {
+            [OperationContract]
+            public int Add(int x, int y)
+            {
+                return x + y;
+            }
+            [OperationContract]
+            public int Subtract(int x, int y)
+            {
+                return x + y;
+            }
+            [OperationContract, WebInvoke]
+            public string Echo(string input)
+            {
+                return input;
+            }
+        }
+        public class MyGetDefaultWebHttpBehavior : WebHttpBehavior
+        {
+            public override void ApplyDispatchBehavior(ServiceEndpoint endpoint, EndpointDispatcher endpointDispatcher)
+            {
+                foreach (var operation in endpoint.Contract.Operations)
+                {
+                    if (operation.Behaviors.Find<WebGetAttribute>() == null && operation.Behaviors.Find<WebInvokeAttribute>() == null)
+                    {
+                        operation.Behaviors.Add(new WebGetAttribute());
+                    }
+                }
+
+                base.ApplyDispatchBehavior(endpoint, endpointDispatcher);
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(Service), new WebHttpBinding(), "").Behaviors.Add(new MyGetDefaultWebHttpBehavior());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            Console.WriteLine(c.DownloadString(baseAddress + "/Add?x=6&y=8"));
+
+            c = new WebClient();
+            Console.WriteLine(c.DownloadString(baseAddress + "/Subtract?x=6&y=8"));
+
+            c = new WebClient();
+            c.Headers[HttpRequestHeader.ContentType] = "application/json";
+            Console.WriteLine(c.UploadString(baseAddress + "/Echo", "\"hello world\""));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_10232385.Test();
+            StackOverflow_10970052.Test();
         }
     }
 }
