@@ -40,6 +40,7 @@ using System.Xml.Serialization;
 using System.Xml.Xsl;
 using UtilCS;
 using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
 
 namespace QuickCode3
 {
@@ -11573,7 +11574,7 @@ Date: Mon, 23 May 2011 06:56:18 GMT
                 this.inner.WriteStartElement(prefix, localName, ns);
             }
 
-            public override WriteState WriteState
+            public override System.Xml.WriteState WriteState
             {
                 get { return this.inner.WriteState; }
             }
@@ -15119,14 +15120,400 @@ Nulla facilisi. Pellentesque nec tellus elit. Proin venenatis mi tristique torto
         }
     }
 
+    // http://stackoverflow.com/q/10581532/751090
+    public class StackOverflow_10581532
+    {
+        [DataContract(Name = "MySample")]
+        public class MySample
+        {
+            [DataMember]
+            public char Charecter { get; set; }
+        }
+
+        public static T DataContractDeserializeObject<T>(string objectToDeserialize)
+        {
+            using (XmlReader reader = XmlReader.Create(new StringReader(objectToDeserialize)))
+            {
+                var serializer =
+                    new DataContractSerializer(typeof(T));
+                return (T)serializer.ReadObject(reader);
+            }
+        } 
+
+        public static void Test()
+        {
+            MemoryStream ms = new MemoryStream();
+            DataContractSerializer dcs = new DataContractSerializer(typeof(MySample));
+            dcs.WriteObject(ms, new MySample { Charecter = 'D' });
+            Console.WriteLine(Encoding.UTF8.GetString(ms.ToArray()));
+        }
+    }
+
+    public class PostXXXXXXX
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string Echo(string text);
+        }
+        public class Service : ITest
+        {
+            public string Echo(string text)
+            {
+                return text;
+            }
+        }
+        static Binding GetBinding()
+        {
+            var result = new WSHttpBinding(SecurityMode.None);
+            //Change binding settings here
+            return result;
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), GetBinding(), "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(GetBinding(), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+            Console.WriteLine(proxy.Echo("Hello"));
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/10679245/751090
+    public class StackOverflow_10679245
+    {
+        public static void Test()
+        {
+
+        }
+    }
+
+    public static class StackOverflow_10679245_Extensions
+    {
+        public static IEnumerable<ArraySegment<T>> ForEachN<T>(this T[] array, int N)
+        {
+            return ForEachN<T>(array, 0, array.Length, N);
+        }
+
+        public static IEnumerable<ArraySegment<T>> ForEachN<T>(this T[] array, int offset, int count, int N)
+        {
+            for (int i = offset; i < count; i += N)
+            {
+                int segmentSize = Math.Min(N, offset + count - i);
+                yield return new ArraySegment<T>(array, i, segmentSize);
+            }
+        }
+    }
+
+    // http://stackoverflow.com/q/10871399/751090
+    public class StackOverflow_10871399
+    {
+        const string XML = @"<?xml version=""1.0""?> 
+<FullServiceAddressCorrectionDelivery xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"" 
+xmlns:xsd=""http://www.w3.org/2001/XMLSchema""> 
+  <AuthenticationInfo xmlns=""http://www.usps.com/postalone/services/UserAuthenticationSchema""> 
+    <UserId xmlns="""">FAPushService</UserId> 
+    <UserPassword xmlns="""">Password4Now</UserPassword> 
+  </AuthenticationInfo> 
+</FullServiceAddressCorrectionDelivery>";
+
+        [DataContract(Name = "FullServiceAddressCorrectionDelivery", Namespace = "")]
+        [Serializable]
+        public class FullServiceAddressCorrectionDelivery
+        {
+            [XmlElement("AuthenticationInfo", Namespace = "http://www.usps.com/postalone/services/UserAuthenticationSchema")]
+            [DataMember]
+            public AuthenticationInfo AuthenticationInfo { get; set; }
+
+            public override string ToString()
+            {
+                return string.Format("FullService[AuthInfo={0}]", AuthenticationInfo);
+            }
+        }
+
+        [DataContract(Name = "AuthenticationInfo", Namespace = "http://www.usps.com/postalone/services/UserAuthenticationSchema")]
+        [Serializable]
+        public class AuthenticationInfo
+        {
+            [DataMember]
+            [XmlElement("UserId", Namespace = "")]
+            public string UserId { get; set; }
+
+            [DataMember]
+            [XmlElement("UserPassword", Namespace = "")]
+            public string UserPassword { get; set; }
+
+            public override string ToString()
+            {
+                return string.Format("AuthInfo[Id={0},Pwd={1}]", UserId, UserPassword);
+            }
+        }
+
+        public static void Test()
+        {
+            MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(XML));
+            DataContractSerializer dcs = new DataContractSerializer(typeof(FullServiceAddressCorrectionDelivery));
+            Console.WriteLine(dcs.ReadObject(ms));
+
+            ms = new MemoryStream();
+            dcs.WriteObject(ms, new FullServiceAddressCorrectionDelivery { AuthenticationInfo = new AuthenticationInfo { UserId = "id", UserPassword = "pwd" } });
+            Console.WriteLine(Encoding.UTF8.GetString(ms.ToArray()));
+
+            Console.WriteLine();
+            Console.WriteLine("----------------------");
+            Console.WriteLine();
+
+            ms = new MemoryStream(Encoding.UTF8.GetBytes(XML));
+            XmlSerializer xs = new XmlSerializer(typeof(FullServiceAddressCorrectionDelivery));
+            Console.WriteLine(xs.Deserialize(ms));
+        }
+    }
+
+    // http://stackoverflow.com/q/11092274/751090
+    public class StackOverflow_11092274
+    {
+        const string XML = @"<?xml version=""1.0"" encoding=""utf-8""?> 
+    <Data xmlns:i=""http://www.w3.org/2001/XMLSchema-instance"" xmlns=""http://schemas.datacontract.org/2004/07/XYZ""> 
+       <Prop1>StringValue</Prop1> 
+       <Prop2>11</Prop2> 
+    </Data>";
+
+        [DataContract(Name = "Data", Namespace = "")]
+        public class Data
+        {
+            [DataMember(Order = 1)]
+            public string Prop1 { get; set; }
+
+            [DataMember(Order = 2)]
+            public int Prop2 { get; set; }
+        }
+
+        public class MyReader : XmlReader
+        {
+            XmlReader inner;
+            public MyReader(XmlReader inner)
+            {
+                this.inner = inner;
+            }
+
+            public override int AttributeCount
+            {
+                get { return inner.AttributeCount; }
+            }
+
+            public override string BaseURI
+            {
+                get { return inner.BaseURI; }
+            }
+
+            public override void Close()
+            {
+                inner.Close();
+            }
+
+            public override int Depth
+            {
+                get { return inner.Depth; }
+            }
+
+            public override bool EOF
+            {
+                get { return inner.EOF; }
+            }
+
+            public override string GetAttribute(int i)
+            {
+                return inner.GetAttribute(i);
+            }
+
+            public override string GetAttribute(string name, string namespaceURI)
+            {
+                return inner.GetAttribute(name, namespaceURI);
+            }
+
+            public override string GetAttribute(string name)
+            {
+                return inner.GetAttribute(name);
+            }
+
+            public override bool IsEmptyElement
+            {
+                get { return inner.IsEmptyElement; }
+            }
+
+            public override string LocalName
+            {
+                get { return inner.LocalName; }
+            }
+
+            public override string LookupNamespace(string prefix)
+            {
+                return inner.LookupNamespace(prefix);
+            }
+
+            public override bool MoveToAttribute(string name, string ns)
+            {
+                return inner.MoveToAttribute(name, ns);
+            }
+
+            public override bool MoveToAttribute(string name)
+            {
+                return inner.MoveToAttribute(name);
+            }
+
+            public override bool MoveToElement()
+            {
+                return inner.MoveToElement();
+            }
+
+            public override bool MoveToFirstAttribute()
+            {
+                return inner.MoveToFirstAttribute();
+            }
+
+            public override bool MoveToNextAttribute()
+            {
+                return inner.MoveToNextAttribute();
+            }
+
+            public override XmlNameTable NameTable
+            {
+                get { return inner.NameTable; }
+            }
+
+            public override string NamespaceURI
+            {
+                get
+                {
+                    if (inner.NamespaceURI == "http://schemas.datacontract.org/2004/07/XYZ")
+                    {
+                        return "";
+                    }
+                    else
+                    {
+                        return inner.NamespaceURI;
+                    }
+                }
+            }
+
+            public override XmlNodeType NodeType
+            {
+                get { return inner.NodeType; }
+            }
+
+            public override string Prefix
+            {
+                get { return inner.Prefix; }
+            }
+
+            public override bool Read()
+            {
+                return inner.Read();
+            }
+
+            public override bool ReadAttributeValue()
+            {
+                return inner.ReadAttributeValue();
+            }
+
+            public override ReadState ReadState
+            {
+                get { return inner.ReadState; }
+            }
+
+            public override void ResolveEntity()
+            {
+                inner.ResolveEntity();
+            }
+
+            public override string Value
+            {
+                get { return inner.Value; }
+            }
+        }
+
+        public static void Test()
+        {
+            DataContractSerializer dcs = new DataContractSerializer(typeof(Data));
+            MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(XML));
+            try
+            {
+                XmlReader r = XmlReader.Create(ms);
+                XmlReader my = new MyReader(r);
+                Data d = (Data)dcs.ReadObject(my);
+                Console.WriteLine("Data[Prop1={0},Prop2={1}]", d.Prop1, d.Prop2);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+            }
+        }
+    }
+
+    // http://stackoverflow.com/q/11218045/751090
+    public class StackOverflow_11218045
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string Echo(string text);
+        }
+        public class Service : ITest
+        {
+            public string Echo(string text)
+            {
+                return text;
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding(), "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            string data = @"<s:Envelope xmlns:s=""http://schemas.xmlsoap.org/soap/envelope/"">
+                                <s:Header/>
+                                <s:Body>
+                                    <Echo xmlns=""http://tempuri.org/"">
+                                        <text>Hello</text>
+                                    </Echo>
+                                </s:Body>
+                            </s:Envelope>";
+            var client = new WebClient();
+            client.UploadStringCompleted += new UploadStringCompletedEventHandler(client_UploadStringCompleted);
+            client.Headers[HttpRequestHeader.ContentType] = "text/xml; charset=utf-8";
+            client.Headers.Add("SOAPAction", "http://tempuri.org/ITest/Echo");
+            client.UploadStringAsync(new Uri(baseAddress), data);
+
+            Thread.Sleep(1000);
+        }
+
+        static void client_UploadStringCompleted(object sender, UploadStringCompletedEventArgs e)
+        {
+            Console.WriteLine(e.Result);
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            Encoding encoding = Encoding.GetEncoding(1251);
-            Console.WriteLine(encoding);
-
-            //TestDescription.Test();
+            StackOverflow_11218045.Test();
         }
     }
 }
