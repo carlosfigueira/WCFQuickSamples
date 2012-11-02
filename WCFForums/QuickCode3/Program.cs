@@ -15498,14 +15498,338 @@ xmlns:xsd=""http://www.w3.org/2001/XMLSchema"">
             client.UploadStringCompleted += new UploadStringCompletedEventHandler(client_UploadStringCompleted);
             client.Headers[HttpRequestHeader.ContentType] = "text/xml; charset=utf-8";
             client.Headers.Add("SOAPAction", "http://tempuri.org/ITest/Echo");
-            client.UploadStringAsync(new Uri(baseAddress), data);
-
-            Thread.Sleep(1000);
+            ManualResetEvent evt = new ManualResetEvent(false);
+            client.UploadStringAsync(new Uri(baseAddress), "POST", data, evt);
+            evt.WaitOne();
         }
 
         static void client_UploadStringCompleted(object sender, UploadStringCompletedEventArgs e)
         {
             Console.WriteLine(e.Result);
+            ((ManualResetEvent)e.UserState).Set();
+        }
+    }
+
+    // http://stackoverflow.com/q/12842014/751090
+    public class StackOverflow_12842014
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string Echo(string text);
+        }
+        public class Service : ITest
+        {
+            public string Echo(string text)
+            {
+                if (text == "throw") throw new ArgumentException("Throwing as requested");
+                return text;
+            }
+        }
+        class MyClient : ClientBase<ITest>, ITest
+        {
+            public MyClient(Binding binding, EndpointAddress address)
+                : base(binding, address)
+            {
+                this.Endpoint.Behaviors.Add(new MyFaultLogger());
+            }
+
+            public string Echo(string text)
+            {
+                return this.Channel.Echo(text);
+            }
+
+            class MyFaultLogger : IEndpointBehavior, IClientMessageInspector
+            {
+                public void AddBindingParameters(ServiceEndpoint endpoint, BindingParameterCollection bindingParameters)
+                {
+                }
+
+                public void ApplyClientBehavior(ServiceEndpoint endpoint, ClientRuntime clientRuntime)
+                {
+                    clientRuntime.MessageInspectors.Add(this);
+                }
+
+                public void ApplyDispatchBehavior(ServiceEndpoint endpoint, EndpointDispatcher endpointDispatcher)
+                {
+                }
+
+                public void Validate(ServiceEndpoint endpoint)
+                {
+                }
+
+                public void AfterReceiveReply(ref Message reply, object correlationState)
+                {
+                    if (reply.IsFault)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine("Fault received!: {0}", reply);
+                        Console.ResetColor();
+                    }
+                }
+
+                public object BeforeSendRequest(ref Message request, IClientChannel channel)
+                {
+                    return null;
+                }
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Description.Behaviors.Find<ServiceDebugBehavior>().IncludeExceptionDetailInFaults = true;
+            host.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding(), "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            MyClient client = new MyClient(new BasicHttpBinding(), new EndpointAddress(baseAddress));
+
+            Console.WriteLine(client.Echo("Hello"));
+            try
+            {
+                Console.WriteLine(client.Echo("throw"));
+            }
+            catch (Exception)
+            {
+                Console.WriteLine("The fault should have been traced");
+            }
+
+            client.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/12825062/751090
+    public class StackOverflow_12825062
+    {
+        [ServiceContract]
+        public class Service
+        {
+            [WebGet]
+            public Stream GetData(bool singleDataPoint)
+            {
+                string result;
+                if (singleDataPoint)
+                {
+                    result = @"{ 
+                      ""Data"": 
+                      { 
+                        ""MyPropertyA"":""Value1"", 
+                        ""MyPropertyB"":""Value2"" 
+                      }, 
+                    }";
+                }
+                else
+                {
+                    result = @"{ 
+                      ""Data"": 
+                      [ 
+                        { 
+                          ""MyPropertyA"":""Value1"", 
+                          ""MyPropertyB"":""Value2"" 
+                        }, 
+                        { 
+                          ""MyPropertyA"":""Value3"", 
+                          ""MyPropertyB"":""Value4"" 
+                        }, 
+                        { 
+                          ""MyPropertyA"":""Value5"", 
+                          ""MyPropertyB"":""Value6"" 
+                        } 
+                      ], 
+                    } ";
+                }
+
+                WebOperationContext.Current.OutgoingResponse.ContentType = "application/json";
+                return new MemoryStream(Encoding.UTF8.GetBytes(result));
+            }
+        }
+        [DataContract]
+        public class MyData
+        {
+            [DataMember]
+            public string MyPropertyA { get; set; }
+
+            [DataMember]
+            public string MyPropertyB { get; set; }
+        }
+        [DataContract]
+        public class MyResponse
+        {
+            [DataMember]
+            public List<MyData> Data { get; set; }
+
+            public override string ToString()
+            {
+                return string.Format("MyResponse, Data.Length={0}", Data.Count);
+            }
+        }
+        [ServiceContract]
+        public interface ITest
+        {
+            [WebGet]
+            MyResponse GetData(bool singleDataPoint);
+        }
+        public class MyResponseSingleOrMultipleClientReplyFormatter : IClientMessageFormatter
+        {
+            IClientMessageFormatter original;
+            public MyResponseSingleOrMultipleClientReplyFormatter(IClientMessageFormatter original)
+            {
+                this.original = original;
+            }
+
+            public object DeserializeReply(Message message, object[] parameters)
+            {
+                WebBodyFormatMessageProperty messageFormat = (WebBodyFormatMessageProperty)message.Properties[WebBodyFormatMessageProperty.Name];
+                if (messageFormat.Format == WebContentFormat.Json)
+                {
+                    MemoryStream ms = new MemoryStream();
+                    XmlDictionaryWriter jsonWriter = JsonReaderWriterFactory.CreateJsonWriter(ms);
+                    message.WriteMessage(jsonWriter);
+                    jsonWriter.Flush();
+                    string json = Encoding.UTF8.GetString(ms.ToArray());
+                    JObject root = JObject.Parse(json);
+                    JToken data = root["Data"];
+                    if (data != null)
+                    {
+                        if (data.Type == JTokenType.Object)
+                        {
+                            // single case, let's wrap it in an array
+                            root["Data"] = new JArray(data);
+                        }
+                    }
+
+                    // Now we need to recreate the message
+                    ms = new MemoryStream(Encoding.UTF8.GetBytes(root.ToString(Newtonsoft.Json.Formatting.None)));
+                    XmlDictionaryReader jsonReader = JsonReaderWriterFactory.CreateJsonReader(ms, XmlDictionaryReaderQuotas.Max);
+                    Message newMessage = Message.CreateMessage(MessageVersion.None, null, jsonReader);
+                    newMessage.Headers.CopyHeadersFrom(message);
+                    newMessage.Properties.CopyProperties(message.Properties);
+                    message = newMessage;
+                }
+
+                return this.original.DeserializeReply(message, parameters);
+            }
+
+            public Message SerializeRequest(MessageVersion messageVersion, object[] parameters)
+            {
+                throw new NotSupportedException("This formatter only supports deserializing reply messages");
+            }
+        }
+        public class MyWebHttpBehavior : WebHttpBehavior
+        {
+            protected override IClientMessageFormatter GetReplyClientFormatter(OperationDescription operationDescription, ServiceEndpoint endpoint)
+            {
+                IClientMessageFormatter result = base.GetReplyClientFormatter(operationDescription, endpoint);
+                if (operationDescription.Messages[1].Body.ReturnValue.Type == typeof(MyResponse))
+                {
+                    return new MyResponseSingleOrMultipleClientReplyFormatter(result);
+                }
+                else
+                {
+                    return result;
+                }
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(new WebHttpBinding(), new EndpointAddress(baseAddress));
+            factory.Endpoint.Behaviors.Add(new MyWebHttpBehavior());
+            ITest proxy = factory.CreateChannel();
+
+            Console.WriteLine(proxy.GetData(false));
+            Console.WriteLine(proxy.GetData(true));
+
+            Console.Write("Press ENTER to close the host");
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/13033174/751090
+    public static class StackOverflow_13033174
+    {
+        public static void Test()
+        {
+            string json = @"{ 
+                              ""Name"": ""Apple"", 
+                              ""Expiry"": new Date(1230422400000), 
+                              ""Price"": 3.99, 
+                              ""ATest"": { 
+                                ""MyTest"": 
+                                [ 
+                                   ""blah"", 
+                                   ""blah"" 
+                                ] 
+                              } 
+                            }";
+
+            JObject jt = JObject.Parse(json);
+            JToken myTest = jt.Descendants()
+                .Where(t => t.Type == JTokenType.Property && ((JProperty)t).Name == "MyTest")
+                .Select(p => ((JProperty)p).Value)
+                .FirstOrDefault();
+            Console.WriteLine(myTest);
+        }
+    }
+
+    // http://stackoverflow.com/q/13188624/751090
+    public class StackOverflow_13188624
+    {
+        const string XML = @"  <Item>
+                                <Description>Timber(dry)</Description>
+                                <Measure Type=""VOLUME"">
+                                  <Value>1.779</Value>
+                                  <Units>m3</Units>
+                                </Measure>
+                                <Measure Type=""WEIGHT"">
+                                  <Value>925.08</Value>
+                                  <Units>Kilogram</Units>
+                                </Measure>
+                                <Measure>
+                                  <Value>1</Value>
+                                  <Units>Units</Units>
+                                </Measure>
+                              </Item>";
+
+        public class Item
+        {
+            public Item()
+            {
+                this.Measures = new List<Measure>();
+            }
+
+            public string Description { get; set; }
+            [XmlElement(ElementName = "Measure")]
+            public List<Measure> Measures { get; set; }
+        }
+
+        public class Measure
+        {
+            public string Value { get; set; }
+            public string Units { get; set; }
+            [System.Xml.Serialization.XmlAttributeAttribute()]
+            public string Type { get; set; }
+        }
+
+        public static void Test()
+        {
+            MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(XML));
+            XmlSerializer xs = new XmlSerializer(typeof(Item));
+            Item item = (Item)xs.Deserialize(ms);
+            Console.WriteLine(item.Measures);
         }
     }
 
@@ -15513,7 +15837,7 @@ xmlns:xsd=""http://www.w3.org/2001/XMLSchema"">
     {
         static void Main(string[] args)
         {
-            StackOverflow_11218045.Test();
+            StackOverflow_13188624.Test();
         }
     }
 }
