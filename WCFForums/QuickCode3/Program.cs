@@ -15833,11 +15833,71 @@ xmlns:xsd=""http://www.w3.org/2001/XMLSchema"">
         }
     }
 
+    // http://stackoverflow.com/q/13225272/751090
+    public class StackOverflow_13225272
+    {
+        [DataContract]
+        public class Person
+        {
+            [DataMember]
+            public string Name { get; set; }
+            [DataMember]
+            public int Age { get; set; }
+
+            public override string ToString()
+            {
+                return string.Format("Person[Name={0},Age={1}]", Name, Age);
+            }
+        }
+        [ServiceContract]
+        public interface ITest
+        {
+            [WebGet(ResponseFormat = WebMessageFormat.Json)]
+            Person GetPerson(string responseContentType);
+        }
+
+        public class Service : ITest
+        {
+            public Person GetPerson(string responseContentType)
+            {
+                WebOperationContext.Current.OutgoingResponse.ContentType = responseContentType;
+                return new Person { Name = "John Doe", Age = 29 };
+            }
+        }
+        class AllJsonContentTypeMapper : WebContentTypeMapper
+        {
+            public override WebContentFormat GetMessageFormatForContentType(string contentType)
+            {
+                return WebContentFormat.Json;
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebHttpBinding binding = new WebHttpBinding();
+            binding.ContentTypeMapper = new AllJsonContentTypeMapper();
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(binding, new EndpointAddress(baseAddress));
+            factory.Endpoint.Behaviors.Add(new WebHttpBehavior());
+            ITest proxy = factory.CreateChannel();
+
+            Console.WriteLine("With JSON: {0}", proxy.GetPerson("application/json"));
+            Console.WriteLine("With XML: {0}", proxy.GetPerson("application/xml"));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_13188624.Test();
+            StackOverflow_13225272.Test();
         }
     }
 }

@@ -157,6 +157,26 @@
             document.getElementById('imageButton1').style.visibility = show1 ? 'visible' : 'hidden';
             document.getElementById('imageButton2').style.visibility = show1 ? 'hidden' : 'visible';
         }
+
+        function StackOverflow_13345557_Test(passParameters) {
+            var baseUrl = "/StackOverflow_13345557.svc";
+            var cacheBuster = new Date().getTime(); // to prevent cached response; development only
+            var url;
+            if (passParameters) {
+                url = baseUrl + "/PingWithParameters?a=123&b=john+doe&_=" + cacheBuster;
+            } else {
+                url = baseUrl + "/Ping?_=" + cacheBuster;
+            }
+            var xhr = new XMLHttpRequest();
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4) {
+                    document.getElementById("result").innerText = xhr.responseText;
+                }
+            }
+
+            xhr.open('GET', url, true);
+            xhr.send();
+        }
     </script>
     <input type="button" value="StackOverflow 8537634" onclick="StackOverflow_8537634_Test();" /> <br />
     <input type="button" value="StackOverflow 10721469" onclick="StackOverflow_10721469_Test();" /> <br />
@@ -166,6 +186,8 @@
     <input type="button" value="MSDN ca5941b4-bfcf-4546-a418-cc91a321c2fb - WS" onclick="Post_ca5941b4_bfcf_4546_a418_cc91a321c2fb_WS();" /><br />
     <input type="button" value="MSDN a72c9431-ce05-43c7-be9e-4aa514c842d7 - Normal" onclick="Post_a72c9431_ce05_43c7_be9e_4aa514c842d7(false);" /><br />
     <input type="button" value="MSDN a72c9431-ce05-43c7-be9e-4aa514c842d7 - JSONP" onclick="Post_a72c9431_ce05_43c7_be9e_4aa514c842d7(true);" /><br />
+    <input type="button" value="StackOverflow 13345557 (no params)" onclick="StackOverflow_13345557_Test(false);" /><br />
+    <input type="button" value="StackOverflow 13345557 (with params)" onclick="StackOverflow_13345557_Test(true);" /><br />
     <img alt="image1" src="images/1.png" id="imageButton1" onclick="SO_10463359_SwapButtons(false);" style="border: 2; visibility: visible;" />
     <img alt="image2" src="images/2.png" id="imageButton2" onclick="SO_10463359_SwapButtons(true);" style="border: 2; visibility: hidden;" /><br />
     <div id='result'></div>
