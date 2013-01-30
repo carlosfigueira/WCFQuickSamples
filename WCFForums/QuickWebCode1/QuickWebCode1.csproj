@@ -67,6 +67,7 @@
     <Content Include="StackOverflow_10721469.svc" />
     <Content Include="StackOverflow_11090835.svc" />
     <Content Include="StackOverflow_11105856.svc" />
+    <Content Include="StackOverflow_13345557.svc" />
     <Content Include="StackOverflow_8537634.svc" />
     <Content Include="Web.config">
       <SubType>Designer</SubType>
@@ -91,6 +92,9 @@
     </Compile>
     <Compile Include="StackOverflow_11105856.svc.cs">
       <DependentUpon>StackOverflow_11105856.svc</DependentUpon>
+    </Compile>
+    <Compile Include="StackOverflow_13345557.svc.cs">
+      <DependentUpon>StackOverflow_13345557.svc</DependentUpon>
     </Compile>
     <Compile Include="StackOverflow_8537634.svc.cs">
       <DependentUpon>StackOverflow_8537634.svc</DependentUpon>

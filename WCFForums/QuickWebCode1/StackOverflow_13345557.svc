@@ -1,0 +1,2 @@
+﻿<%@ ServiceHost Language="C#" Debug="true" Service="StackOverflow_13345557.Service1"
+                CodeBehind="StackOverflow_13345557.svc.cs" %>
