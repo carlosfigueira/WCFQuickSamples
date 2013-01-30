@@ -1138,10 +1138,155 @@ Public Class Post_98b7a23b_9096_400d_84f1_8c20447cfcac
     End Sub
 End Class
 
+Public Class Post_14f4d972_c6da_414a_9215_bc376b8e117a
+    <ServiceContract()> _
+    Public Interface ITest
+        <OperationContract()> _
+        <WebInvoke(Method:="POST", _
+                   RequestFormat:=WebMessageFormat.Xml, _
+                   ResponseFormat:=WebMessageFormat.Xml, _
+                   BodyStyle:=WebMessageBodyStyle.Bare, _
+                   UriTemplate:="GetInfo")> _
+        Function GetInfo(ByVal request As InfoRequest) As InfoResponse
+    End Interface
+    <DataContract(Name:="InfoResponse", Namespace:="")> _
+    Public Class InfoResponse
+        <DataMember()> _
+        Public Property Data As String
+    End Class
+    <DataContract(Name:="InfoRequest", Namespace:="")> _
+    Public Class InfoRequest
+        Private employeeIdField As String
+        Private WeightField As String
+        Public Sub New()
+        End Sub
+        <DataMember(Order:=0)> _
+        Public Property EmployeeId() As String
+            Get
+                Return Me.employeeIdField
+            End Get
+            Set(ByVal value As String)
+                Me.employeeIdField = value
+            End Set
+        End Property
+        <DataMember(Order:=1)> _
+        Public Property Weight() As String
+            Get
+                Return Me.WeightField
+            End Get
+            Set(ByVal value As String)
+                Try
+                    If Integer.TryParse(value, 0) Then
+                        Me.WeightField = value
+                    Else
+                        Throw New Exception("Please pass integer datatype.")
+                    End If
+                Catch ex As Exception
+                    Throw ex
+                End Try
+            End Set
+        End Property
+    End Class
+    Public Class Service
+        Implements ITest
+
+        Public Function GetInfo(request As InfoRequest) As InfoResponse Implements ITest.GetInfo
+            Dim result As InfoResponse = New InfoResponse
+            result.Data = String.Format("{0} - {1}", request.EmployeeId, request.Weight)
+            Return result
+        End Function
+
+    End Class
+    Public Class MyErrorHandler
+        Implements IEndpointBehavior
+        Implements IErrorHandler
+
+        Public Sub AddBindingParameters(endpoint As ServiceEndpoint, bindingParameters As BindingParameterCollection) Implements IEndpointBehavior.AddBindingParameters
+
+        End Sub
+
+        Public Sub ApplyClientBehavior(endpoint As ServiceEndpoint, clientRuntime As ClientRuntime) Implements IEndpointBehavior.ApplyClientBehavior
+
+        End Sub
+
+        Public Sub ApplyDispatchBehavior(endpoint As ServiceEndpoint, endpointDispatcher As EndpointDispatcher) Implements IEndpointBehavior.ApplyDispatchBehavior
+            endpointDispatcher.ChannelDispatcher.ErrorHandlers.Add(Me)
+        End Sub
+
+        Public Sub Validate(endpoint As ServiceEndpoint) Implements IEndpointBehavior.Validate
+
+        End Sub
+
+        Public Function HandleError([error] As System.Exception) As Boolean Implements IErrorHandler.HandleError
+            Return True
+        End Function
+
+        Public Sub ProvideFault([error] As System.Exception, version As MessageVersion, ByRef fault As Message) Implements IErrorHandler.ProvideFault
+            Dim response = String.Format("<error><message>{0}</message></error>", [error].Message)
+            Dim newFault = Message.CreateMessage(version, Nothing, New MyBodyWriter([error].Message))
+            newFault.Headers.CopyHeadersFrom(fault)
+
+            ' Force the format we want
+            Dim formatProp = New WebBodyFormatMessageProperty(WebContentFormat.Xml)
+            newFault.Properties(WebBodyFormatMessageProperty.Name) = formatProp
+
+            fault = newFault
+        End Sub
+
+        Class MyBodyWriter
+            Inherits BodyWriter
+
+            Private message As String
+
+            Public Sub New(ByVal message As String)
+                MyBase.New(True)
+                Me.message = message
+            End Sub
+
+            Protected Overrides Sub OnWriteBodyContents(writer As System.Xml.XmlDictionaryWriter)
+                writer.WriteStartElement("error")
+                writer.WriteStartElement("message")
+                writer.WriteString(Me.message)
+                writer.WriteEndElement()
+                writer.WriteEndElement()
+            End Sub
+        End Class
+    End Class
+    Public Shared Sub Test()
+        Dim baseAddress As String = "http://" + Environment.MachineName + ":8000/Service"
+        Dim host As ServiceHost = New ServiceHost(GetType(Service), New Uri(baseAddress))
+        Dim endpoint = host.AddServiceEndpoint(GetType(ITest), New WebHttpBinding(), "")
+        endpoint.Behaviors.Add(New WebHttpBehavior())
+        endpoint.Behaviors.Add(New MyErrorHandler())
+        host.Open()
+        Console.WriteLine("Host opened")
+
+        Dim client As New WebClient()
+        client.Headers(HttpRequestHeader.ContentType) = "text/xml"
+        Dim body = <InfoRequest>
+                       <EmployeeId>123</EmployeeId>
+                       <Weight>abc</Weight>
+                   </InfoRequest>
+        Try
+            Dim response = client.UploadString(baseAddress + "/GetInfo", body.ToString())
+            Console.WriteLine(response)
+        Catch ex As WebException
+            Dim resp = CType(ex.Response, HttpWebResponse)
+            Console.WriteLine("HTTP/{0} {1} {2}", resp.ProtocolVersion, CInt(resp.StatusCode), resp.StatusDescription)
+            For Each headerName In resp.Headers.AllKeys
+                Console.WriteLine("{0}: {1}", headerName, resp.Headers(headerName))
+            Next
+            Console.WriteLine(New StreamReader(resp.GetResponseStream()).ReadToEnd())
+        End Try
+
+        host.Close()
+    End Sub
+End Class
+
 Module Module1
 
     Sub Main()
-        StackOverflow_10554490.Test()
+        Post_14f4d972_c6da_414a_9215_bc376b8e117a.Test()
     End Sub
 
 End Module

@@ -27,8 +27,7 @@ namespace QuickCode1
         }
         static Binding GetBinding()
         {
-            var result = new WSHttpBinding(SecurityMode.None);
-            //Change binding settings here
+            var result = new BasicHttpBinding();
             return result;
         }
         public static void Test()
