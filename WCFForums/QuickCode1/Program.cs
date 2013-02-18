@@ -1,6 +1,7 @@
 ﻿using System;
 using System.CodeDom;
 using System.CodeDom.Compiler;
+using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
@@ -13,8 +14,10 @@ using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Net;
 using System.Net.Security;
+using System.Numerics;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
@@ -34,16 +37,14 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
+using System.Web.Script.Serialization;
 using System.Xml;
 using System.Xml.Linq;
 using System.Xml.Schema;
 using System.Xml.Serialization;
-using UtilCS;
-using System.Numerics;
-using System.Web.Script.Serialization;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System.Collections;
+using UtilCS;
 
 
 namespace QuickCode1
@@ -24229,11 +24230,75 @@ namespace QuickCode1
         }
     }
 
+    // http://stackoverflow.com/q/14714085/751090
+    public class StackOverflow_14714085
+    {
+        const string JSON = @"{
+                              ""response"": {
+                                ""_token"": ""StringValue"",
+                                ""code"": ""OK"",
+                                ""user"": {
+                                  ""userid"": ""2630944"",
+                                  ""firstname"": ""John"",
+                                  ""lastname"": ""Doe"",
+                                  ""reference"": ""999999999"",
+                                  ""guid"": ""StringValue"",
+                                  ""domainid"": ""99999"",
+                                  ""username"": ""jdoe"",
+                                  ""email"": ""jdoe@jdoe.edu"",
+                                  ""passwordquestion"": """",
+                                  ""flags"": ""0"",
+                                  ""lastlogindate"": ""2013-02-05T17:54:06.31Z"",
+                                  ""creationdate"": ""2011-04-15T14:40:07.22Z"",
+                                  ""version"": ""3753"",
+                                  ""data"": {
+                                    ""aliasname"": {
+                                      ""$value"": ""John Doe""
+                                    },
+                                    ""smsaddress"": {
+                                      ""$value"": ""5555555555@messaging.sprintpcs.com""
+                                    },
+                                    ""blti"": {
+                                      ""hideemail"": ""false"",
+                                      ""hidefullname"": ""false""
+                                    },
+                                    ""notify"": {
+                                      ""grades"": {
+                                        ""$value"": ""0""
+                                      },
+                                      ""messages"": {
+                                        ""$value"": ""1""
+                                      }
+                                    },
+                                    ""beta_component_courseplanexpress_1"": {
+                                      ""$value"": ""true""
+                                    }
+                                  }
+                                }
+                              }
+                            }";
+
+        public static void Test()
+        {
+            var jo = JObject.Parse(JSON);
+            var data = (JObject)jo["response"]["user"]["data"];
+            foreach (var item in data)
+            {
+                Console.WriteLine("{0}: {1}", item.Key, item.Value);
+            }
+        }
+    }
+
+
+    public class StackOverflow_
+    {
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_14602036.Test();
+            StackOverflow_14714085.Test();
         }
     }
 }
