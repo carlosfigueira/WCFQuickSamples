@@ -9,6 +9,51 @@
 </head>
 <body>
     <script type="text/javascript">
+        function StackOverflow_15001755_Test() {
+            function dictionaryToKVPArray(obj) {
+                var data = [];
+                for (var key in obj) {
+                    data.push({ Key: key, Value: obj[key] });
+                }
+
+                return data;
+            }
+
+            function KVPArrayToDictionary(arr) {
+                var result = {};
+                arr.forEach(function (item) {
+                    result[item.Key] = item.Value;
+                });
+
+                return result;
+            }
+
+            var map = {};
+            map['a'] = 1;
+            map['b'] = 2;
+            map['c'] = 3;
+            var data = dictionaryToKVPArray(map);
+
+            var baseUrl = "/StackOverflow_15001755.svc";
+            $.ajax({
+                type: 'POST',
+                url: baseUrl + '/setDictionary',
+                contentType: 'application/json',
+                data: JSON.stringify({ myDictionary: data }),
+                success: function (result) {
+                    $('#result').text('Sent the dictionary');
+                    $.ajax({
+                        type: 'GET',
+                        url: baseUrl + '/getDictionary',
+                        success: function (result) {
+                            var newMap = KVPArrayToDictionary(result);
+                            $('#result2').text(JSON.stringify(newMap));
+                        }
+                    });
+                }
+            });
+        }
+
         function StackOverflow_11105856_Test() {
             var url = "/StackOverflow_11105856.svc/UpdateEmployee";
             var data = {
@@ -190,7 +235,9 @@
     <input type="button" value="StackOverflow 13345557 (with params)" onclick="StackOverflow_13345557_Test(true);" /><br />
     <img alt="image1" src="images/1.png" id="imageButton1" onclick="SO_10463359_SwapButtons(false);" style="border: 2; visibility: visible;" />
     <img alt="image2" src="images/2.png" id="imageButton2" onclick="SO_10463359_SwapButtons(true);" style="border: 2; visibility: hidden;" /><br />
-    <div id='result'></div>
+    <input type="button" value="StackOverflow 15001755" onclick="StackOverflow_15001755_Test();" /><br />
+    <div id='result'></div><br />
+    <div id='result2'></div><br />
 
     <script type="text/javascript">
         // Initialization

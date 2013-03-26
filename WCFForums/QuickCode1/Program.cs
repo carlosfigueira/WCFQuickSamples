@@ -24289,16 +24289,731 @@ namespace QuickCode1
         }
     }
 
-
-    public class StackOverflow_
+    // http://stackoverflow.com/q/14944788/751090
+    public class StackOverflow_14944788
     {
+        public class MyObject
+        {
+            public string Text1 { get; set; }
+            public string Text2 { get; set; }
+
+            public MyObject(string text1, string text2)
+            {
+                Text1 = text1;
+                Text2 = text2;
+            }
+        }
+
+        public static void Test()
+        {
+            List<MyObject> myObjects = new List<MyObject>();
+            myObjects.Add(new MyObject("sample11", "sample12"));
+            myObjects.Add(new MyObject("sample21", "sample22"));
+            myObjects.Add(new MyObject("sample31", "sample32"));
+            myObjects.Add(new MyObject("sample41", "sample42"));
+            myObjects.Add(new MyObject("sample51", "sample52"));
+
+            MySpecialFunction(myObjects, f => f.Text1);
+            MySpecialFunction(myObjects, f => f.Text2);
+        }
+
+        private static void MySpecialFunction(IEnumerable<MyObject> list, Func<MyObject, string> selector, int count = 3)
+        {
+            string result = string.Join(", ", list.Take(count).Select(selector));
+            int listSize = list.Count();
+            if (listSize > count)
+            {
+                result += ", and " + (listSize - count) + " more.";
+            }
+
+            Console.WriteLine(result);
+        }
+    }
+
+    // http://stackoverflow.com/q/14945653/751090
+    public class StackOverflow_14945653
+    {
+        [DataContract]
+        public class Person
+        {
+            [DataMember]
+            public string Name { get; set; }
+            [DataMember]
+            public int Age { get; set; }
+            [DataMember]
+            public Address Address { get; set; }
+        }
+        [DataContract]
+        public class Address
+        {
+            [DataMember]
+            public string Street;
+            [DataMember]
+            public string City;
+            [DataMember]
+            public string Zip;
+        }
+        [ServiceContract]
+        public interface ITest
+        {
+            [WebInvoke(RequestFormat = WebMessageFormat.Json, ResponseFormat = WebMessageFormat.Json)]
+            void RegisterPerson(Person p);
+            [WebGet(RequestFormat = WebMessageFormat.Json, ResponseFormat = WebMessageFormat.Json)]
+            Person FindPerson(string name);
+        }
+        public class Service : ITest
+        {
+            private static List<Person> AllPeople = new List<Person>();
+
+            public void RegisterPerson(Person p)
+            {
+                AllPeople.Add(p);
+            }
+
+            public Person FindPerson(string name)
+            {
+                return AllPeople.Where(p => p.Name == name).FirstOrDefault();
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            Console.WriteLine("Accessing via WebChannelFactory<T>");
+            WebChannelFactory<ITest> factory = new WebChannelFactory<ITest>(new Uri(baseAddress));
+            ITest proxy = factory.CreateChannel();
+            proxy.RegisterPerson(new Person
+            {
+                Name = "John Doe",
+                Age = 32,
+                Address = new Address
+                {
+                    City = "Springfield",
+                    Street = "123 Main St",
+                    Zip = "12345"
+                }
+            });
+            Console.WriteLine(proxy.FindPerson("John Doe").Age);
+            Console.WriteLine();
+
+            Console.WriteLine("Accessing via \"normal\" HTTP client");
+            string jsonInput = "{'Name':'Jane Roe','Age':30,'Address':{'Street':'1 Wall St','City':'Springfield','Zip':'12346'}}".Replace('\'', '\"');
+            WebClient c = new WebClient();
+            c.Headers[HttpRequestHeader.ContentType] = "application/json";
+            c.UploadString(baseAddress + "/RegisterPerson", jsonInput);
+
+            c = new WebClient();
+            Console.WriteLine(c.DownloadString(baseAddress + "/FindPerson?name=Jane Roe"));
+            Console.WriteLine();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_b0acdde8_4d1d_4640_a76e_19baa311e8be
+    {
+        public class Employee
+        {
+            public string EmpID { get; set; }
+            public string Name { get; set; }
+
+            public override string ToString()
+            {
+                return string.Format("Employee[{0} - {1}]", EmpID, Name);
+            }
+        }
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            [WebInvoke(ResponseFormat = WebMessageFormat.Json)]
+            [MyBehavior]
+            Employee Echo(Employee employee);
+
+            [OperationContract]
+            [WebGet(ResponseFormat = WebMessageFormat.Json)]
+            [MyBehavior]
+            int Add(int x, int y);
+        }
+        public class Service : ITest
+        {
+            public Employee Echo(Employee employee)
+            {
+                return employee;
+            }
+            public int Add(int x, int y)
+            {
+                return x + y;
+            }
+        }
+        class MyParameterInspector : IParameterInspector
+        {
+            public void AfterCall(string operationName, object[] outputs, object returnValue, object correlationState)
+            {
+            }
+
+            public object BeforeCall(string operationName, object[] inputs)
+            {
+                for (int i = 0; i < inputs.Length; i++)
+                {
+                    if (inputs[i] is Employee)
+                    {
+                        Employee emp = (Employee)inputs[i];
+                        emp.Name = emp.Name + "-modified";
+                    }
+                    else if (inputs[i] is int)
+                    {
+                        inputs[i] = (int)inputs[i] + 1000;
+                    }
+                }
+
+                return null;
+            }
+        }
+        class MyBehaviorAttribute : Attribute, IOperationBehavior
+        {
+            public void AddBindingParameters(OperationDescription operationDescription, BindingParameterCollection bindingParameters)
+            {
+            }
+
+            public void ApplyClientBehavior(OperationDescription operationDescription, ClientOperation clientOperation)
+            {
+            }
+
+            public void ApplyDispatchBehavior(OperationDescription operationDescription, DispatchOperation dispatchOperation)
+            {
+                dispatchOperation.ParameterInspectors.Add(new MyParameterInspector());
+            }
+
+            public void Validate(OperationDescription operationDescription)
+            {
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding(), "soap");
+            host.AddServiceEndpoint(typeof(ITest), new WebHttpBinding(), "rest").Behaviors.Add(new WebHttpBehavior());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            Console.WriteLine("Consuming the SOAP endpoint");
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(new BasicHttpBinding(), new EndpointAddress(baseAddress + "/soap"));
+            ITest proxy = factory.CreateChannel();
+            Console.WriteLine("Echo: {0}", proxy.Echo(new Employee { Name = "John", EmpID = "1234" }));
+            Console.WriteLine("Add: {0}", proxy.Add(30, 45));
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+            Console.WriteLine();
+
+            Console.WriteLine("Consuming the REST endpoint");
+            WebClient c = new WebClient();
+            c.Headers[HttpRequestHeader.ContentType] = "application/json";
+            Console.WriteLine("Echo: {0}", c.UploadString(baseAddress + "/rest/Echo", "{\"Name\":\"Jane\",\"EmpID\":\"9876\"}"));
+            c = new WebClient();
+            Console.WriteLine("Add: {0}", c.DownloadString(baseAddress + "/rest/Add?x=33&y=88"));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class Post_5767b27e_5607_47ec_9e56_ed052aa2f80d
+    {
+        [XmlRoot(Namespace = "http://my.namespace/AAA")]
+        public class Requestor
+        {
+            [XmlElement(Namespace = "http://my.namespace/BBB")]
+            public PersonName PersonName { get; set; }
+            [XmlElement(Namespace = "http://my.namespace/CCC")]
+            public Location Location { get; set; }
+        }
+        public class PersonName
+        {
+            public string PersonFullName { get; set; }
+        }
+        public class Location
+        {
+            public string LocationText { get; set; }
+        }
+        [ServiceContract]
+        [XmlSerializerFormat]
+        public interface ITest
+        {
+            [OperationContract]
+            string Process(Requestor requestor);
+        }
+        public class Service : ITest
+        {
+            public string Process(Requestor requestor)
+            {
+                return string.Format("PN: {0}, L: {1}", requestor.PersonName.PersonFullName, requestor.Location.LocationText);
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding(), "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(new BasicHttpBinding(), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+            Requestor r = new Requestor
+            {
+                Location = new Location { LocationText = "LT" },
+                PersonName = new PersonName { PersonFullName = "PFN" }
+            };
+
+            Console.WriteLine(proxy.Process(r));
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+
+            Console.WriteLine();
+            Console.WriteLine("The serialized version:");
+            MemoryStream ms = new MemoryStream();
+            XmlSerializer xs = new XmlSerializer(typeof(Requestor));
+            xs.Serialize(ms, r);
+            Console.WriteLine(Encoding.UTF8.GetString(ms.ToArray()));
+        }
+    }
+
+    // http://stackoverflow.com/q/15289120/751090
+    public class StackOverflow_15289120
+    {
+        [ServiceContract]
+        public class Service
+        {
+            [WebGet(UriTemplate = "RetrieveUserInformation/{hash}/{*app}")]
+            public string RetrieveUserInformation(string hash, string app)
+            {
+                return hash + " - " + app;
+            }
+            [WebGet(UriTemplate = "RetrieveUserInformation2/{hash}/{app=default}")]
+            public string RetrieveUserInformation2(string hash, string app)
+            {
+                return hash + " - " + app;
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            Console.WriteLine(c.DownloadString(baseAddress + "/RetrieveUserInformation/dsakldasda/Apple"));
+            Console.WriteLine();
+
+            c = new WebClient();
+            Console.WriteLine(c.DownloadString(baseAddress + "/RetrieveUserInformation/dsakldasda"));
+            Console.WriteLine();
+
+            c = new WebClient();
+            Console.WriteLine(c.DownloadString(baseAddress + "/RetrieveUserInformation2/dsakldasda"));
+            Console.WriteLine();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/15441384/751090
+    public class StackOverflow_15441384
+    {
+        const string XML = @"<StartLot>
+                                   <fileCreationDate level=""7"">201301132210</fileCreationDate>
+                                   <fmtVersion level=""7"">3.0</fmtVersion>
+                                </StartLot>";
+        public class StartLot
+        {
+            [XmlElement("fileCreationDate")]
+            public LevelAndValue FileCreationDate { get; set; }
+            [XmlElement("fmtVersion")]
+            public LevelAndValue FmtVersion { get; set; }
+        }
+        public class LevelAndValue
+        {
+            [XmlAttribute("level")]
+            public string Level { get; set; }
+            [XmlText]
+            public string Value { get; set; }
+        }
+        public static void Test()
+        {
+            XmlSerializer xs = new XmlSerializer(typeof(StartLot));
+            StartLot sl = (StartLot)xs.Deserialize(new MemoryStream(Encoding.UTF8.GetBytes(XML)));
+            Console.WriteLine("FCD.L = {0}", sl.FileCreationDate.Level);
+            Console.WriteLine("FCD.V = {0}", sl.FileCreationDate.Value);
+            Console.WriteLine("FV.L = {0}", sl.FmtVersion.Level);
+            Console.WriteLine("FV.V = {0}", sl.FmtVersion.Value);
+        }
+    }
+
+    // http://stackoverflow.com/q/15471185/751090
+    public class StackOverflow_15471185
+    {
+        [ServiceContract]
+        public interface IService1
+        {
+            [OperationContract]
+            Hashtable GetHashTableCollection();
+            [OperationContract]
+            List<A> GetARecords();
+        }
+
+        [DataContract]
+        public class A
+        {
+            [DataMember]
+            public int MyProperty { get; set; }
+
+            [DataMember]
+            public Hashtable MyTable { get; set; }
+        }
+
+        public class Service : IService1
+        {
+            public Hashtable GetHashTableCollection()
+            {
+                Hashtable hashtable = new Hashtable();
+                hashtable.Add("Area", 1000);
+                hashtable.Add("Perimeter", 55);
+                hashtable.Add("Mortgage", 540);
+                return hashtable;
+
+            }
+
+            public List<A> GetARecords()
+            {
+                List<A> Alist = new List<A>();
+                Alist.Add(new A { MyProperty = 1, MyTable = GetHashTableCollection() });
+                Alist.Add(new A { MyProperty = 2, MyTable = GetHashTableCollection() });
+
+                return Alist;
+            }
+        }
+
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(IService1), new BasicHttpBinding(), "");
+            host.Description.Behaviors.Add(new ServiceMetadataBehavior { HttpGetEnabled = true });
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            var factory = new ChannelFactory<IService1>(new BasicHttpBinding(), new EndpointAddress(baseAddress));
+            var proxy = factory.CreateChannel();
+            Console.WriteLine(proxy.GetHashTableCollection());
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class StackOverflow_15471185_b
+    {
+        [ServiceContract]
+        public interface IService1
+        {
+            [OperationContract]
+            MyDic GetHashTableCollection();
+            [OperationContract]
+            List<A> GetARecords();
+        }
+
+        public class MyDic : IDictionary
+        {
+            public IDictionary dic = new Hashtable();
+
+            public void Add(object key, object value)
+            {
+                dic.Add(key, value);
+            }
+
+            public void Clear()
+            {
+                dic.Clear();
+            }
+
+            public bool Contains(object key)
+            {
+                return dic.Contains(key);
+            }
+
+            public IDictionaryEnumerator GetEnumerator()
+            {
+                return dic.GetEnumerator();
+            }
+
+            public bool IsFixedSize
+            {
+                get { return dic.IsFixedSize; }
+            }
+
+            public bool IsReadOnly
+            {
+                get { return dic.IsReadOnly; }
+            }
+
+            public ICollection Keys
+            {
+                get { return dic.Keys; }
+            }
+
+            public void Remove(object key)
+            {
+                dic.Remove(key);
+            }
+
+            public ICollection Values
+            {
+                get { return dic.Values; }
+            }
+
+            public object this[object key]
+            {
+                get
+                {
+                    return dic[key];
+                }
+                set
+                {
+                    dic[key] = value;
+                }
+            }
+
+            public void CopyTo(Array array, int index)
+            {
+                dic.CopyTo(array, index);
+            }
+
+            public int Count
+            {
+                get { return dic.Count; }
+            }
+
+            public bool IsSynchronized
+            {
+                get { return dic.IsSynchronized; }
+            }
+
+            public object SyncRoot
+            {
+                get { return dic.SyncRoot; }
+            }
+
+            IEnumerator IEnumerable.GetEnumerator()
+            {
+                return ((IEnumerable)dic).GetEnumerator();
+            }
+        }
+
+        [DataContract]
+        public class A
+        {
+            [DataMember]
+            public int MyProperty { get; set; }
+
+            [DataMember]
+            public MyDic MyTable { get; set; }
+        }
+
+        public class Service : IService1
+        {
+            public MyDic GetHashTableCollection()
+            {
+                MyDic hashtable = new MyDic();
+                hashtable.Add("Area", 1000);
+                hashtable.Add("Perimeter", 55);
+                hashtable.Add("Mortgage", 540);
+                return hashtable;
+
+            }
+
+            public List<A> GetARecords()
+            {
+                List<A> Alist = new List<A>();
+                Alist.Add(new A { MyProperty = 1, MyTable = GetHashTableCollection() });
+                Alist.Add(new A { MyProperty = 2, MyTable = GetHashTableCollection() });
+
+                return Alist;
+            }
+        }
+
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(IService1), new BasicHttpBinding(), "");
+            host.Description.Behaviors.Add(new ServiceMetadataBehavior { HttpGetEnabled = true });
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            var factory = new ChannelFactory<IService1>(new BasicHttpBinding(), new EndpointAddress(baseAddress));
+            var proxy = factory.CreateChannel();
+            Console.WriteLine(proxy.GetHashTableCollection());
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/15637994/751090
+    public class StackOverflow_15637994
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string Echo(string text);
+            [OperationContract]
+            int Execute(string operation, int x, int y);
+            [OperationContract]
+            bool InOutAndRefParameters(int x, ref int y, out int z);
+        }
+        public class Service : ITest
+        {
+            public string Echo(string text)
+            {
+                return text;
+            }
+
+            public int Execute(string operation, int x, int y)
+            {
+                return x + y;
+            }
+
+            public bool InOutAndRefParameters(int x, ref int y, out int z)
+            {
+                z = y;
+                y = x;
+                return true;
+            }
+        }
+        public class MyInspector : IParameterInspector
+        {
+            string[] inputParameterNames;
+            string[] outputParameterNames;
+            public MyInspector(string[] inputParameterNames, string[] outputParameterNames)
+            {
+                this.inputParameterNames = inputParameterNames;
+                this.outputParameterNames = outputParameterNames;
+            }
+
+            public void AfterCall(string operationName, object[] outputs, object returnValue, object correlationState)
+            {
+                Console.WriteLine("Operation: {0}", operationName);
+                Console.WriteLine("  Result: {0}", returnValue);
+                for (int i = 0; i < outputs.Length; i++)
+                {
+                    Console.WriteLine("  [out] {0}: {1}", this.outputParameterNames[i], outputs[i]);
+                }
+            }
+
+            public object BeforeCall(string operationName, object[] inputs)
+            {
+                Console.WriteLine("Operation: {0}", operationName);
+                for (int i = 0; i < inputs.Length; i++)
+                {
+                    Console.WriteLine("  {0}: {1}", this.inputParameterNames[i], inputs[i]);
+                }
+
+                return null;
+            }
+        }
+        public class MyBehavior : IEndpointBehavior
+        {
+            public void AddBindingParameters(ServiceEndpoint endpoint, BindingParameterCollection bindingParameters)
+            {
+            }
+
+            public void ApplyClientBehavior(ServiceEndpoint endpoint, ClientRuntime clientRuntime)
+            {
+            }
+
+            public void ApplyDispatchBehavior(ServiceEndpoint endpoint, EndpointDispatcher endpointDispatcher)
+            {
+                foreach (var operation in endpoint.Contract.Operations)
+                {
+                    string[] inputParamNames = operation.Messages[0].Body.Parts
+                        .OrderBy(mpd => mpd.Index)
+                        .Select(mpd => mpd.Name)
+                        .ToArray();
+                    string[] outputParamNames = null;
+                    if (operation.Messages.Count > 1)
+                    {
+                        outputParamNames = operation.Messages[1].Body.Parts
+                            .OrderBy(mpd => mpd.Index)
+                            .Select(mpd => mpd.Name)
+                            .ToArray();
+                    }
+
+                    MyInspector inspector = new MyInspector(inputParamNames, outputParamNames);
+                    endpointDispatcher.DispatchRuntime.Operations[operation.Name].ParameterInspectors.Add(inspector);
+                }
+            }
+
+            public void Validate(ServiceEndpoint endpoint)
+            {
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            ServiceEndpoint endpoint = host.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding(), "");
+            endpoint.Behaviors.Add(new MyBehavior());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(new BasicHttpBinding(), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+
+            proxy.Echo("Hello");
+            proxy.Execute("foo", 2, 5);
+            int z;
+            int y = 2;
+            proxy.InOutAndRefParameters(3, ref y, out z);
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
     }
 
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_14714085.Test();
+            StackOverflow_15637994.Test();
         }
     }
 }
