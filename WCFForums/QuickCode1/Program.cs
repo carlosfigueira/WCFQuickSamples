@@ -24892,7 +24892,7 @@ namespace QuickCode1
             [OperationContract]
             string Echo(string text);
             [OperationContract]
-            int Execute(string operation, int x, int y);
+            int Execute(string op, int x, int y);
             [OperationContract]
             bool InOutAndRefParameters(int x, ref int y, out int z);
         }
@@ -24903,7 +24903,7 @@ namespace QuickCode1
                 return text;
             }
 
-            public int Execute(string operation, int x, int y)
+            public int Execute(string op, int x, int y)
             {
                 return x + y;
             }
@@ -25009,11 +25009,347 @@ namespace QuickCode1
         }
     }
 
+    public class Post_03a2b109_c400_49d4_891e_03871ae0d083
+    {
+        static readonly string RestServiceBaseAddress = "http://" + Environment.MachineName + ":8008/Service";
+        static readonly string NormalServiceBaseAddress = "http://" + Environment.MachineName + ":8000/Service";
+
+        [ServiceContract]
+        public interface IRestInterface
+        {
+            [OperationContract, WebGet]
+            int Add(int x, int y);
+            [OperationContract, WebGet]
+            string Echo(string input);
+        }
+        [ServiceContract]
+        public interface INormalInterface
+        {
+            [OperationContract]
+            int CallAdd(int x, int y);
+            [OperationContract]
+            string CallEcho(string input);
+        }
+        public class RestService : IRestInterface
+        {
+            public int Add(int x, int y)
+            {
+                return x + y;
+            }
+
+            public string Echo(string input)
+            {
+                return input;
+            }
+        }
+        public class MyRestClient : ClientBase<IRestInterface>, IRestInterface
+        {
+            public MyRestClient(string address)
+                : base(new WebHttpBinding(), new EndpointAddress(address))
+            {
+                this.Endpoint.Behaviors.Add(new WebHttpBehavior());
+            }
+
+            public int Add(int x, int y)
+            {
+                using (new OperationContextScope(this.InnerChannel))
+                {
+                    return base.Channel.Add(x, y);
+                }
+            }
+
+            public string Echo(string input)
+            {
+                using (new OperationContextScope(this.InnerChannel))
+                {
+                    return base.Channel.Echo(input);
+                }
+            }
+        }
+        public class NormalService : INormalInterface
+        {
+            static MyRestClient client = new MyRestClient(RestServiceBaseAddress);
+            public int CallAdd(int x, int y)
+            {
+                return client.Add(x, y);
+            }
+
+            public string CallEcho(string input)
+            {
+                return client.Echo(input);
+            }
+        }
+        public static void Test()
+        {
+            ServiceHost restHost = new ServiceHost(typeof(RestService), new Uri(RestServiceBaseAddress));
+            restHost.AddServiceEndpoint(typeof(IRestInterface), new WebHttpBinding(), "").Behaviors.Add(new WebHttpBehavior());
+            restHost.Open();
+
+            ServiceHost normalHost = new ServiceHost(typeof(NormalService), new Uri(NormalServiceBaseAddress));
+            normalHost.AddServiceEndpoint(typeof(INormalInterface), new BasicHttpBinding(), "");
+            normalHost.Open();
+
+            Console.WriteLine("Hosts opened");
+
+            ChannelFactory<INormalInterface> factory = new ChannelFactory<INormalInterface>(new BasicHttpBinding(), new EndpointAddress(NormalServiceBaseAddress));
+            INormalInterface proxy = factory.CreateChannel();
+
+            Console.WriteLine(proxy.CallAdd(123, 456));
+            Console.WriteLine(proxy.CallEcho("Hello world"));
+        }
+    }
+
+    // http://stackoverflow.com/q/15752476/751090
+    public class StackOverflow_15752476
+    {
+        const string jsonString = @" 
+            {
+                ""RequestId"":514106,
+                ""Warning"":[],
+                ""CustomerData"": {
+                    ""Email"":""abc@abc.com"",
+                    ""FullName"":""OrTguOfE"",
+                    ""OrderData"":[{
+                        ""OrderId"":""123"",
+                        ""SourceId"":""0"",
+                        ""SourceData"": [{
+                            ""SourceDescription"":""This is sourcedesc"",
+                            ""ProductName"":""xyzabc""
+                        }]
+                    }]
+                }
+            }";
+
+        public static void Test()
+        {
+            RecordInfo records = Deserialize<RecordInfo>(jsonString);
+            Console.WriteLine(records.CustomerData.OrderData.Length);
+            Console.WriteLine(records.CustomerData.OrderData[0].OrderId);
+            Console.WriteLine(records.CustomerData.OrderData[0].SourceId);
+            Console.WriteLine(records.CustomerData.OrderData[0].SourceData[0].ProductName);
+        }
+
+        private static T Deserialize<T>(string jsonString)
+        {
+            using (var ms = new MemoryStream(Encoding.Unicode.GetBytes(jsonString)))
+            {
+                var serializer = new DataContractJsonSerializer(typeof(T));
+                return (T)serializer.ReadObject(ms);
+            }
+        }
+
+        [DataContract]
+        public class RecordInfo
+        {
+            [DataMember(Name = "RequestId")]
+            public string RequestId { get; set; }
+
+            [DataMember(Name = "Warning")]
+            public string Warning { get; set; }
+
+            [DataMember(Name = "CustomerData")]
+            public CustomerData CustomerData { get; set; }
+        }
+
+        [DataContract]
+        public class CustomerData
+        {
+            [DataMember(Name = "Email")]
+            public string RequestId { get; set; }
+
+            [DataMember(Name = "FullName")]
+            public string FullName { get; set; }
+
+            [DataMember(Name = "OrderData")]
+            public OrderData[] OrderData { get; set; }
+        }
+
+        [DataContract]
+        public class OrderData
+        {
+            [DataMember(Name = "OrderId")]
+            public string OrderId { get; set; }
+
+            [DataMember(Name = "SourceId")]
+            public string SourceId { get; set; }
+
+            [DataMember(Name = "SourceData")]
+            public SourceData[] SourceData { get; set; }
+        }
+
+        [DataContract]
+        public class SourceData
+        {
+            [DataMember(Name = "SourceDescription")]
+            public string SourceDescription { get; set; }
+
+            [DataMember(Name = "ProductName")]
+            public string ProductName { get; set; }
+        }
+    }
+
+    // http://stackoverflow.com/q/15753513
+    public class StackOverflow_15753513
+    {
+        const string JSON = @"{""SomeKey"": 
+            {
+                ""Name"": ""Some name"",
+                ""Type"": ""Some type""
+            },
+            ""SomeOtherKey"": 
+            {
+                ""Name"": ""Some other name"",
+                ""Type"": ""Some type""
+            }
+        }";
+        public class MyChildClass
+        {
+            [JsonProperty("Name")]
+            public String Name { get; set; }
+            [JsonProperty("Type")]
+            public String Type { get; set; }
+        }
+        public class MyRootClass
+        {
+            [JsonProperty("InsertMiracleCodeHere")]
+            public String Key { get; set; }
+            [JsonProperty("Name")]
+            public String Name { get; set; }
+            [JsonProperty("Type")]
+            public String Type { get; set; }
+        }
+        public static void Test()
+        {
+            var data = JsonConvert
+                .DeserializeObject<Dictionary<string, MyChildClass>>(JSON)
+                .Select(o => new MyRootClass { Key = o.Key, Name = o.Value.Name, Type = o.Value.Type })
+                .ToArray();
+            Console.WriteLine(string.Join("\n", data.Select(o => string.Format("[{0}, {1}, {2}]", o.Key, o.Name, o.Type))));
+        }
+    }
+
+    // http://stackoverflow.com/q/15786448/751090
+    public class StackOverflow_15786448
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            [WebInvoke(UriTemplate = "AddNewLocation",
+                Method = "POST",
+                BodyStyle = WebMessageBodyStyle.Bare,
+                ResponseFormat = WebMessageFormat.Json,
+                RequestFormat = WebMessageFormat.Json)]
+            string AddNewLocation(NearByAttractions newLocation);
+        }
+        public class NearByAttractions
+        {
+            public double Lat { get; set; }
+            public double Lng { get; set; }
+            public string Name { get; set; }
+        }
+        public class Service : ITest
+        {
+            public string AddNewLocation(NearByAttractions newLocation)
+            {
+                if (newLocation == null)
+                {
+                    //I'm always getting this text in my logfile
+                    Console.WriteLine("In add new location:- Is Null");
+                }
+                else
+                {
+                    Console.WriteLine("In add new location:- ");
+                }
+
+                //String is returned even though parameter is null
+                return "59";
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            Console.WriteLine("Using WCF-based client (WebChannelFactory)");
+            var factory = new WebChannelFactory<ITest>(new Uri(baseAddress));
+            var proxy = factory.CreateChannel();
+            var newLocation = new NearByAttractions { Lat = 12, Lng = -34, Name = "56" };
+            Console.WriteLine(proxy.AddNewLocation(newLocation));
+
+            Console.WriteLine();
+            Console.WriteLine("Now with WebClient");
+
+            DataContractJsonSerializer ser = new DataContractJsonSerializer(typeof(NearByAttractions));
+            MemoryStream ms = new MemoryStream();
+            ser.WriteObject(ms, newLocation);
+
+            String json = Encoding.UTF8.GetString(ms.ToArray());
+
+            WebClient clientNewLocation = new WebClient();
+            clientNewLocation.Headers[HttpRequestHeader.ContentType] = "application/json";
+
+            string r = clientNewLocation.UploadString(baseAddress + "/AddNewLocation", json);
+
+            Console.WriteLine(r);
+        }
+    }
+
+    // http://stackoverflow.com/q/15887772/751090
+    public class StackOverflow_15887772
+    {
+        //[XmlInclude(typeof(Case1))]
+        //[XmlInclude(typeof(Case2))]
+        //[XmlInclude(typeof(Case3))]
+        public class FileRepo
+        {
+            public string Name { set; get; }
+            public DateTime Time { get; set; }
+            public bool Correct { get; set; }
+        }
+
+        public class Case1 : FileRepo { public string Data { get; set; } }
+        public class Case2 : FileRepo { public string Data { get; set; } }
+        public class Case3 : FileRepo { public string Data { get; set; } }
+
+        public static void SerializetoXml(FileRepo repo)
+        {
+            MemoryStream ms = new MemoryStream();
+            var serializer = new XmlSerializer(typeof(FileRepo), new Type[] { typeof(Case1), typeof(Case2) });
+            serializer.Serialize(ms, repo);
+            Console.WriteLine("Serialized type {0}:", repo.GetType().Name);
+            Console.WriteLine(Encoding.UTF8.GetString(ms.ToArray()));
+        }
+
+        public static void Test()
+        {
+            SerializetoXml(new Case1 { Data = "case 1", Correct = true, Name = "goo", Time = DateTime.UtcNow });
+            SerializetoXml(new Case2 { Data = "case 2", Correct = true, Name = "goo", Time = DateTime.UtcNow });
+            try
+            {
+                // this will fail, Case3 isn't passed to the XmlSerializer .ctor
+                SerializetoXml(new Case3 { Data = "case 3", Correct = true, Name = "goo", Time = DateTime.UtcNow });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("{0}: {1}", ex.GetType().FullName, ex.Message);
+                Exception inner = ex.InnerException;
+                while (inner != null)
+                {
+                    Console.WriteLine("    {0}: {1}", inner.GetType().FullName, inner.Message);
+                    inner = inner.InnerException;
+                }
+            }
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_15637994.Test();
+            StackOverflow_15887772.Test();
         }
     }
 }
