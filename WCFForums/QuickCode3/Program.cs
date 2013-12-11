@@ -41,6 +41,7 @@ using System.Xml.Xsl;
 using UtilCS;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Schema;
 
 namespace QuickCode3
 {
@@ -15893,11 +15894,300 @@ xmlns:xsd=""http://www.w3.org/2001/XMLSchema"">
         }
     }
 
+    // http://stackoverflow.com/q/19336832/751090
+    public class StackOverflow_19336832
+    {
+        public class RequiredAttribute : Attribute
+        {
+            public string ErrorMessage { get; set; }
+        }
+
+        public class Person
+        {
+            public int ID { get; set; }
+
+            [Required(ErrorMessage = "Name is required.")]
+            public string Name { get; set; }
+
+            public DateTime Birthday { get; set; }
+
+            public bool IsMarried { get; set; }
+        }
+
+        static JObject GetSchema(Type type)
+        {
+            var result = new JObject();
+            foreach (var prop in type.GetProperties())
+            {
+                var name = prop.Name;
+                var propType = prop.PropertyType;
+                var field = new JObject();
+                result.Add(name, field);
+                switch (Type.GetTypeCode(propType))
+                {
+                    case TypeCode.Boolean:
+                        field.Add("type", "bool");
+                        break;
+                    case TypeCode.Int16:
+                    case TypeCode.Int32:
+                    case TypeCode.Int64:
+                    case TypeCode.UInt16:
+                    case TypeCode.UInt32:
+                    case TypeCode.UInt64:
+                    case TypeCode.Double:
+                    case TypeCode.Single:
+                        field.Add("type", "number");
+                        break;
+                    case TypeCode.String:
+                        field.Add("type", "string");
+                        break;
+                    case TypeCode.DateTime:
+                        field.Add("type", "date");
+                        break;
+                    default:
+                        throw new ArgumentException("Don't know how to generate schema for property with type " + propType.FullName);
+                }
+
+                var req = prop.GetCustomAttributes(typeof(RequiredAttribute), false).FirstOrDefault() as RequiredAttribute;
+                if (req != null)
+                {
+                    var validation = new JObject();
+                    field.Add("validation", validation);
+                    validation.Add("required", true);
+                    if (!string.IsNullOrEmpty(req.ErrorMessage))
+                    {
+                        validation.Add("message", req.ErrorMessage);
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        public static void Test()
+        {
+            var schema = GetSchema(typeof(Person));
+            Console.WriteLine(schema);
+            Console.WriteLine();
+            var schema2 = new JsonSchemaGenerator().Generate(typeof(Person));
+            Console.WriteLine(schema2);
+        }
+    }
+
+    public class Post_75a5cd8f_09ef_4212_a3b5_1255622f5300
+    {
+        [DataContract]
+        public class Book
+        {
+            [DataMember(IsRequired = true, EmitDefaultValue = false)]
+            public string Title { get; set; }
+        }
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string GetTitle(Book book);
+        }
+        public class Service : ITest
+        {
+            public string GetTitle(Book book)
+            {
+                return book.Title;
+            }
+        }
+        static Binding GetBinding()
+        {
+            var result = new BasicHttpBinding();
+            return result;
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), GetBinding(), "");
+            host.Description.Behaviors.Add(new ServiceMetadataBehavior { HttpGetEnabled = true });
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(GetBinding(), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+            Console.WriteLine(proxy.GetTitle(new Book { Title = "Hello" }));
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/16674152/751090
+    public class StackOverflow_16674152
+    {
+        [Serializable]
+        public class JsonDictionary : ISerializable
+        {
+            private Dictionary<string, object> _Dictionary;
+            public JsonDictionary()
+            {
+                _Dictionary = new Dictionary<string, object>();
+            }
+            public JsonDictionary(SerializationInfo info, StreamingContext context)
+            {
+                _Dictionary = new Dictionary<string, object>();
+                SerializationInfoEnumerator enumerator = info.GetEnumerator();
+                while (enumerator.MoveNext())
+                {
+                    _Dictionary.Add(enumerator.Name, enumerator.Value);
+                }
+            }
+            public object this[string key]
+            {
+                get { return _Dictionary[key]; }
+                set { _Dictionary[key] = value; }
+            }
+            public void Add(string key, object value)
+            {
+                _Dictionary.Add(key, value);
+            }
+            public bool ContainsKey(string key)
+            {
+                return _Dictionary.ContainsKey(key);
+            }
+            public void GetObjectData(SerializationInfo info, StreamingContext context)
+            {
+                foreach (string key in _Dictionary.Keys)
+                    info.AddValue(key, _Dictionary[key], _Dictionary[key] == null ? typeof(object) : _Dictionary[key].GetType());
+            }
+        }
+        [ServiceContract]
+        public class Service
+        {
+            [WebGet(UriTemplate = "", ResponseFormat = WebMessageFormat.Json)]
+            [MyISerializableResponseJsonBehavior]
+            public JsonDictionary GetCollection()
+            {
+                JsonDictionary dict = new JsonDictionary();
+
+                dict.Add("Hello world", 100);
+                return dict;
+            }
+        }
+        public class MyFormatter : IDispatchMessageFormatter
+        {
+            IDispatchMessageFormatter original;
+            string replyAction;
+            public MyFormatter(IDispatchMessageFormatter original, string replyAction)
+            {
+                this.original = original;
+                this.replyAction = replyAction;
+            }
+
+            public void DeserializeRequest(Message message, object[] parameters)
+            {
+                this.original.DeserializeRequest(message, parameters);
+            }
+
+            public Message SerializeReply(MessageVersion messageVersion, object[] parameters, object result)
+            {
+                ISerializable serializable = result as ISerializable;
+                if (serializable != null)
+                {
+                    string json = JsonConvert.SerializeObject(serializable);
+                    byte[] bytes = Encoding.UTF8.GetBytes(json);
+                    var writer = new MyRawWriter(bytes);
+                    Message reply = Message.CreateMessage(messageVersion, replyAction, writer);
+                    reply.Properties.Add(WebBodyFormatMessageProperty.Name, new WebBodyFormatMessageProperty(WebContentFormat.Raw));
+                    return reply;
+                }
+                else
+                {
+                    return this.original.SerializeReply(messageVersion, parameters, result);
+                }
+            }
+
+            class MyRawWriter : BodyWriter
+            {
+                byte[] data;
+                public MyRawWriter(byte[] data)
+                    : base(true)
+                {
+                    this.data = data;
+                }
+
+                protected override void OnWriteBodyContents(XmlDictionaryWriter writer)
+                {
+                    writer.WriteStartElement("Binary");
+                    writer.WriteBase64(data, 0, data.Length);
+                    writer.WriteEndElement();
+                }
+            }
+        }
+        public class MyISerializableResponseJsonBehaviorAttribute : Attribute, IOperationBehavior
+        {
+            public void AddBindingParameters(OperationDescription operationDescription, BindingParameterCollection bindingParameters)
+            {
+            }
+
+            public void ApplyClientBehavior(OperationDescription operationDescription, ClientOperation clientOperation)
+            {
+            }
+
+            public void ApplyDispatchBehavior(OperationDescription operationDescription, DispatchOperation dispatchOperation)
+            {
+                if (operationDescription.Messages.Count > 1)
+                {
+                    dispatchOperation.Formatter = new MyFormatter(dispatchOperation.Formatter, operationDescription.Messages[1].Action);
+                }
+            }
+
+            public void Validate(OperationDescription operationDescription)
+            {
+                if (operationDescription.Messages.Count > 1)
+                {
+                    var respMessage = operationDescription.Messages[1];
+                    if (respMessage.Body.Parts.Count > 0)
+                    {
+                        throw new InvalidOperationException("Cannot be used with out/ref parameters");
+                    }
+                }
+
+                var wga = operationDescription.Behaviors.Find<WebGetAttribute>();
+                var wia = operationDescription.Behaviors.Find<WebInvokeAttribute>();
+                WebMessageBodyStyle bodyStyle = WebMessageBodyStyle.Bare; // default
+                if (wga != null && wga.IsBodyStyleSetExplicitly) {
+                    bodyStyle = wga.BodyStyle;
+                }
+
+                if (wia != null && wia.IsBodyStyleSetExplicitly) {
+                    bodyStyle = wia.BodyStyle;
+                }
+
+                if (bodyStyle == WebMessageBodyStyle.Wrapped || bodyStyle == WebMessageBodyStyle.WrappedResponse)
+                {
+                    throw new InvalidOperationException("This behavior can only be used with bare response style");
+                }
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(Service), new WebHttpBinding(), "").Behaviors.Add(new WebHttpBehavior());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            Console.WriteLine(c.DownloadString(baseAddress + "/"));
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_13225272.Test();
+            StackOverflow_16674152.Test();
         }
     }
 }

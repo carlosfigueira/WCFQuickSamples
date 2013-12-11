@@ -1,6 +1,6 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 11.00
-# Visual Studio 2010
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuickCode1", "QuickCode1\QuickCode1.csproj", "{2A18E8A1-F918-40CC-BB49-6BBD27455143}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UtilCS", "UtilCS\UtilCS.csproj", "{133C6720-8C9F-4F87-94CE-9785B8FA15F8}"
