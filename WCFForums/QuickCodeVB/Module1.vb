@@ -13,6 +13,7 @@ Imports System.Xml
 Imports System.ComponentModel
 Imports System.Xml.Serialization
 Imports System.Xml.Schema
+Imports Newtonsoft.Json
 
 Public Class Post_ed4dee9d_6a49_4bf9_9724_cbf873105e62
     <ServiceContract(Name:="ABCService", Namespace:="http://abc.com/WCFService/")> _
@@ -1283,10 +1284,80 @@ Public Class Post_14f4d972_c6da_414a_9215_bc376b8e117a
     End Sub
 End Class
 
+Public Class StackOverflow_17956746
+    Public Class OutputPlannif
+        <JsonProperty("plannifReponse")> _
+        Public PlannifReponse As PlannifReponse
+    End Class
+
+    Public Class PlannifReponse
+        <JsonProperty("@competence")> _
+        Public Competence As String
+
+        <JsonProperty("plannifDonnees")> _
+        Public PlannifDonnees As PlannifDonnees
+    End Class
+
+    Public Class PlannifDonnees
+        <JsonProperty("entry")> _
+        Public Entries As List(Of Entry)
+    End Class
+
+    Public Class Entry
+        <JsonProperty("key")> _
+        Public Key As String
+        <JsonProperty("value")> _
+        Public Value As Value
+    End Class
+
+    Public Class Value
+        <JsonProperty("creneaux")> _
+        Public ListCreneaux As List(Of Creneau)
+    End Class
+
+    Public Class Creneau
+        <JsonProperty("@jour")> _
+        Public Jour As String
+        <JsonProperty("@heure")> _
+        Public Heure As String
+        <JsonProperty("@minute")> _
+        Public Minute As String
+        <JsonProperty("nomberRessources")> _
+        Public NombreRessources As Integer
+    End Class
+
+    Const JSON As String = "{" & vbCrLf & _
+"    ""plannifReponse"":" & vbCrLf & _
+"{""@competence"":""Abonnement"",""plannifDonnees"":" & vbCrLf & _
+"{""entry"":" & vbCrLf & _
+"[" & vbCrLf & _
+"{""key"":""2013-8-11T00:00"",""value"":" & vbCrLf & _
+"{""creneaux"":" & vbCrLf & _
+"[" & vbCrLf & _
+"{""@jour"":""2013-8-11T00:00"",""@heure"":""09"",""@minute"":""30"",""nombreRessources"":10}," & vbCrLf & _
+"{""@jour"":""2013-8-11T00:00"",""@heure"":""10"",""@minute"":""30"",""nombreRessources"":2}," & vbCrLf & _
+"{""@jour"":""2013-8-11T00:00"",""@heure"":""17"",""@minute"":""30"",""nombreRessources"":5}," & vbCrLf & _
+"{""@jour"":""2013-8-11T00:00"",""@heure"":""20"",""@minute"":""30"",""nombreRessources"":5}," & vbCrLf & _
+"{""@jour"":""2013-8-11T00:00"",""@heure"":""21"",""@minute"":""00"",""nombreRessources"":16}" & vbCrLf & _
+"]" & vbCrLf & _
+"}" & vbCrLf & _
+"}," & vbCrLf & _
+"{""key"":""2013-7-30T00:00"",""value"":" & vbCrLf & _
+"{""creneaux"":" & vbCrLf & _
+"[{""@jour"":""2013-7-30T00:00"",""@heure"":""12"",""@minute"":""00"",""nombreRessources"":4},{""@jour"":""2013-7-30T00:00"",""@heure"":""12"",""@minute"":""15"",""nombreRessources"":10},{""@jour"":""2013-7-30T00:00"",""@heure"":""12"",""@minute"":""30"",""nombreRessources"":3},{""@jour"":""2013-7-30T00:00"",""@heure"":""14"",""@minute"":""00"",""nombreRessources"":8},{""@jour"":""2013-7-30T00:00"",""@heure"":""18"",""@minute"":""30"",""nombreRessources"":10}]}}]}}}"
+
+    Public Shared Sub Test()
+        Dim output As OutputPlannif
+        output = JsonConvert.DeserializeObject(Of OutputPlannif)(JSON)
+        Console.WriteLine(output)
+    End Sub
+End Class
+
+
 Module Module1
 
     Sub Main()
-        Post_14f4d972_c6da_414a_9215_bc376b8e117a.Test()
+        StackOverflow_17956746.Test()
     End Sub
 
 End Module

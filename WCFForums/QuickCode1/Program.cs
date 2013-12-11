@@ -25345,11 +25345,831 @@ namespace QuickCode1
         }
     }
 
+    public class MyCode_12
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [WebGet]
+            Resource GetResource(int id);
+            [WebInvoke(Method = "PUT")]
+            void PutResource(Resource resource);
+        }
+        public class Service : ITest
+        {
+            public static List<Resource> allResources = new List<Resource>();
+            public Resource GetResource(int id)
+            {
+                var result = allResources.Where(r => r.id == id).FirstOrDefault();
+                if (result == null)
+                {
+                    throw new WebFaultException(HttpStatusCode.NotFound);
+                }
+
+                return result;
+            }
+            public void PutResource(Resource resource)
+            {
+                string status = WebOperationContext.Current.IncomingRequest.Headers["x-status-code"] ?? "200";
+                if (status != "200")
+                {
+                    throw new WebFaultException((HttpStatusCode)int.Parse(status));
+                }
+
+                allResources.Add(resource);
+            }
+        }
+        public class Resource
+        {
+            public int id;
+            public string name;
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            var factory = new ChannelFactory<ITest>(new WebHttpBinding(), new EndpointAddress(baseAddress));
+            factory.Endpoint.Behaviors.Add(new WebHttpBehavior());
+            var proxy = factory.CreateChannel();
+
+            Console.WriteLine("PUT - success case:");
+            using (new OperationContextScope((IContextChannel)proxy))
+            {
+                proxy.PutResource(new Resource { id = 1, name = "My resource" });
+                Console.WriteLine("  - Status code: {0}", WebOperationContext.Current.IncomingResponse.StatusCode);
+            }
+
+            Console.WriteLine("GET - success case:");
+            using (new OperationContextScope((IContextChannel)proxy))
+            {
+                proxy.GetResource(1);
+                Console.WriteLine("  - Status code: {0}", WebOperationContext.Current.IncomingResponse.StatusCode);
+            }
+
+            Console.WriteLine("GET - failure case:");
+            using (new OperationContextScope((IContextChannel)proxy))
+            {
+                try
+                {
+                    proxy.GetResource(999);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("  - {0}: {1}", ex.GetType().FullName, ex.Message);
+                    Exception inner = ex.InnerException;
+                    while (inner != null)
+                    {
+                        Console.WriteLine("    - {0}: {1}", inner.GetType().FullName, inner.Message);
+                        if (inner is WebException)
+                        {
+                            Console.WriteLine("  - Status code: {0}", ((HttpWebResponse)((WebException)inner).Response).StatusCode);
+                        }
+
+                        inner = inner.InnerException;
+                    }
+                }
+            }
+
+            Console.WriteLine("PUT - failure case:");
+            using (new OperationContextScope((IContextChannel)proxy))
+            {
+                try
+                {
+                    WebOperationContext.Current.OutgoingRequest.Headers["x-status-code"] = "503";
+                    proxy.PutResource(new Resource { id = 2, name = "another resource" });
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("  - {0}: {1}", ex.GetType().FullName, ex.Message);
+                    Exception inner = ex.InnerException;
+                    while (inner != null)
+                    {
+                        Console.WriteLine("    - {0}: {1}", inner.GetType().FullName, inner.Message);
+                        if (inner is WebException)
+                        {
+                            Console.WriteLine("  - Status code: {0}", ((HttpWebResponse)((WebException)inner).Response).StatusCode);
+                        }
+
+                        inner = inner.InnerException;
+                    }
+                }
+            }
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/16859875/751090
+    public class StackOverflow_16859875
+    {
+        public class PageItem
+        {
+            public string Page { get; set; }
+            public int Priority { get; set; }
+        }
+
+        public class PathItem
+        {
+            public List<string> Path { get; set; }
+            public int Priority { get; set; }
+            public string name { get; set; }
+        }
+
+        public class RefererItem
+        {
+            public string Referer { get; set; }
+            public int Priority { get; set; }
+        }
+
+        public class UserAgentItem
+        {
+            public string UserAgent { get; set; }
+            public int Priority { get; set; }
+        }
+
+        public class Item
+        {
+            public int Priority { get; set; }
+            public List<PageItem> Pages { get; set; }
+            public List<PathItem> Paths { get; set; }
+            public List<PathItem> AfterPaths { get; set; }
+            public List<RefererItem> Referers { get; set; }
+            public List<UserAgentItem> UserAgents { get; set; }
+            public string name { get; set; }
+        }
+
+        private static string CreateString(Random rndGen)
+        {
+            const string Letters = "abcdefghijklmnopqrstuvwxyz";
+            int size = rndGen.Next(1, 10);
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < size; i++)
+            {
+                sb.Append(Letters[rndGen.Next(Letters.Length)]);
+            }
+
+            return sb.ToString();
+        }
+
+        private static UserAgentItem CreateUserAgentItem(Random rndGen)
+        {
+            return new UserAgentItem
+            {
+                Priority = rndGen.Next(),
+                UserAgent = CreateString(rndGen)
+            };
+        }
+
+        private static PageItem CreatePageItem(Random rndGen)
+        {
+            return new PageItem 
+            {
+                Priority = rndGen.Next(),
+                Page = CreateString(rndGen)
+            };
+        }
+
+        private static RefererItem CreateRefererItem(Random rndGen)
+        {
+            return new RefererItem 
+            {
+                Priority = rndGen.Next(),
+                Referer = CreateString(rndGen)
+            };
+        }
+
+        private static PathItem CreatePathItem(Random rndGen)
+        {
+            PathItem result = new PathItem();
+            int pathSize = rndGen.Next(1, 10);
+            result.Path = Enumerable.Range(1, pathSize).Select(_ => CreateString(rndGen)).ToList();
+            result.name = CreateString(rndGen);
+            result.Priority = rndGen.Next();
+            return result;
+        }
+
+        public static List<Item> CreateInput()
+        {
+            const int itemCount = 2258;
+            const int userAgentCount = 10141;
+            Random rndGen = new Random(1);
+            List<Item> result = new List<Item>();
+            for (int i = 0; i < itemCount; i++)
+            {
+                Item item = new Item();
+                result.Add(item);
+                item.Priority = rndGen.Next();
+                item.name = CreateString(rndGen);
+                item.Pages = Enumerable.Range(0, rndGen.Next(5)).Select(_ => CreatePageItem(rndGen)).ToList();
+                item.Paths = Enumerable.Range(0, rndGen.Next(5)).Select(_ => CreatePathItem(rndGen)).ToList();
+                item.AfterPaths = Enumerable.Range(0, rndGen.Next(5)).Select(_ => CreatePathItem(rndGen)).ToList();
+                item.Referers = Enumerable.Range(0, rndGen.Next(5)).Select(_ => CreateRefererItem(rndGen)).ToList();
+                item.UserAgents = new List<UserAgentItem>();
+                for (int j = 0; j < userAgentCount; j++)
+                {
+                    item.UserAgents.Add(CreateUserAgentItem(rndGen));
+                }
+            }
+
+            return result;
+        }
+
+        public static void Test()
+        {
+            var input = CreateInput();
+            Console.WriteLine("Created the input");
+            JsonSerializerSettings jsonSerializerSettings = new JsonSerializerSettings
+            {
+                PreserveReferencesHandling = PreserveReferencesHandling.Objects,
+                NullValueHandling = NullValueHandling.Ignore,
+                ReferenceLoopHandling = ReferenceLoopHandling.Ignore
+            };
+            using (StreamWriter sw = File.CreateText(@"c:\temp\a.json"))
+            {
+                using (JsonWriter jw = new JsonTextWriter(sw))
+                {
+                    JsonSerializer js = new JsonSerializer();
+                    js.PreserveReferencesHandling = PreserveReferencesHandling.Objects;
+                    js.NullValueHandling = NullValueHandling.Ignore;
+                    js.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
+                    js.Serialize(jw, input);
+                }
+            }
+        }
+    }
+
+    // http://stackoverflow.com/q/16901903/751090
+    public class StackOverflow_16901903
+    {
+        public class Request
+        {
+            //[XmlElement(ElementName = "ModifiedElementName")]
+            [XmlArray(ElementName = "MyEnums")]
+            [XmlArrayItem(ElementName = "ModifiedElementName")]
+            public List<MyEnum> MyEnums { get; set; }
+        }
+
+        public enum MyEnum
+        {
+            One,
+            Two,
+            Three
+        }
+
+        public static void Test()
+        {
+            XmlSerializer xs = new XmlSerializer(typeof(Request));
+            MemoryStream ms = new MemoryStream();
+            Request req = new Request
+            { 
+                MyEnums = new List<MyEnum>
+                {
+                    MyEnum.One,
+                    MyEnum.Two,
+                    MyEnum.Three
+                }
+            };
+            xs.Serialize(ms, req);
+            Console.WriteLine(Encoding.UTF8.GetString(ms.ToArray()));
+        }
+    }
+
+    public class MyCode_13
+    {
+        enum DictionaryType { NoDictionary, SessionDictionary }
+        static DictionaryType dictionaryType = DictionaryType.NoDictionary;
+
+        [DataContract(Name = "MyData", Namespace = "")]
+        public class MyData
+        {
+            [DataMember(Name = "int", EmitDefaultValue = false)]
+            public int[] iArr;
+            [DataMember(Name = "uint", EmitDefaultValue = false)]
+            public uint[] uiArr;
+        }
+        class MyWriterSession : XmlBinaryWriterSession
+        {
+            List<KeyValuePair<int, string>> strings = new List<KeyValuePair<int,string>>();
+            public override bool TryAdd(XmlDictionaryString value, out int key)
+            {
+                if (base.TryAdd(value, out key))
+                {
+                    strings.Add(new KeyValuePair<int, string>(key, value.Value));
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            public XmlBinaryReaderSession GetReaderSession()
+            {
+                XmlBinaryReaderSession rs = new XmlBinaryReaderSession();
+                foreach (var item in strings)
+                {
+                    rs.Add(item.Key, item.Value);
+                }
+
+                return rs;
+            }
+        }
+        public static void PrintBytes(byte[] bytes)
+        {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                if (i > 0 && ((i % 16) == 0))
+                {
+                    Console.WriteLine("   {0}", sb.ToString());
+                    sb.Length = 0;
+                }
+                else if (i > 0 && ((i % 8) == 0))
+                {
+                    Console.Write(" ");
+                    sb.Append(' ');
+                }
+
+                Console.Write(" {0:X2}", (int)bytes[i]);
+                if (' ' <= bytes[i] && bytes[i] <= '~')
+                {
+                    sb.Append((char)bytes[i]);
+                }
+                else
+                {
+                    sb.Append('.');
+                }
+            }
+
+            if ((bytes.Length % 16) > 0)
+            {
+                int spacesToPrint = 3 * (16 - (bytes.Length % 16));
+                if ((bytes.Length % 16) <= 8)
+                {
+                    spacesToPrint++;
+                }
+
+                Console.Write(new string(' ', spacesToPrint));
+            }
+
+            Console.WriteLine("   {0}", sb.ToString());
+        }
+        public static void Serialize(MyData data, string fileName = null)
+        {
+            MemoryStream ms = new MemoryStream();
+            MyWriterSession ws = null;
+            XmlDictionary dic = null;
+            if (dictionaryType == DictionaryType.SessionDictionary)
+            {
+                ws = new MyWriterSession();
+            }
+
+            XmlDictionaryWriter w = XmlDictionaryWriter.CreateBinaryWriter(ms, dic, ws);
+            DataContractSerializer dcs = new DataContractSerializer(typeof(MyData));
+            dcs.WriteObject(w, data);
+            w.Flush();
+            byte[] bytes = ms.ToArray();
+            PrintBytes(bytes);
+            if (fileName != null) File.WriteAllBytes(fileName, bytes);
+
+            ms = new MemoryStream(bytes);
+            XmlBinaryReaderSession rs = null;
+            if (dictionaryType == DictionaryType.SessionDictionary)
+            {
+                rs = ws.GetReaderSession();
+            }
+
+            XmlDictionaryReader r = XmlDictionaryReader.CreateBinaryReader(bytes, 0, bytes.Length, dic, XmlDictionaryReaderQuotas.Max, rs);
+            MemoryStream ms2 = new MemoryStream();
+            XmlWriter w2 = XmlWriter.Create(ms2, new XmlWriterSettings { Indent = true, OmitXmlDeclaration = true, IndentChars = "  ", Encoding = new UTF8Encoding(false) });
+            w2.WriteNode(r, true);
+            w2.Flush();
+            Console.WriteLine(Encoding.UTF8.GetString(ms2.ToArray()));
+        }
+        public static void Test()
+        {
+            Console.WriteLine("int[]");
+            Serialize(new MyData { iArr = new int[] { -1, 0, 1, int.MaxValue, int.MinValue } }, @"c:\temp\intArray.bin");
+            Console.WriteLine();
+            Console.WriteLine("uint[]");
+            Serialize(new MyData { uiArr = new uint[] { 0, 1, ((uint)int.MaxValue) + 1, uint.MaxValue } }, @"c:\temp\uintArray.bin");
+        }
+    }
+
+    // http://stackoverflow.com/q/7003740/751090
+    public class StackOverflow_7003740
+    {
+        static Dictionary<string, object> NvcToDictionary(NameValueCollection nvc, bool handleMultipleValuesPerKey)
+        {
+            var result = new Dictionary<string, object>();
+            foreach (string key in nvc.Keys)
+            {
+                if (handleMultipleValuesPerKey)
+                {
+                    string[] values = nvc.GetValues(key);
+                    if (values.Length == 1)
+                    {
+                        result.Add(key, values[0]);
+                    }
+                    else
+                    {
+                        result.Add(key, values);
+                    }
+                }
+                else
+                {
+                    result.Add(key, nvc[key]);
+                }
+            }
+
+            return result;
+        }
+
+        public static void Test()
+        {
+            NameValueCollection nvc = new NameValueCollection();
+            nvc.Add("foo", "bar");
+            nvc.Add("multiple", "first");
+            nvc.Add("multiple", "second");
+
+            foreach (var handleMultipleValuesPerKey in new bool[] { false, true })
+            {
+                if (handleMultipleValuesPerKey)
+                {
+                    Console.WriteLine("Using special handling for multiple values per key");
+                }
+                var dict = NvcToDictionary(nvc, handleMultipleValuesPerKey);
+                string json = new JavaScriptSerializer().Serialize(dict);
+                Console.WriteLine(json);
+                Console.WriteLine();
+            }
+        }
+    }
+
+    // http://stackoverflow.com/q/17545605/751090
+    public class StackOverflow_17545605
+    {
+        [JsonConverter(typeof(CommitDataConverter))]
+        public class CommitData
+        {
+            public AddressDTO Property { get; set; }
+
+            public DateTime? Closed { get; set; }
+
+            public string LenderRef { get; set; }
+
+            public string YearBuilt { get; set; }
+
+            public IDictionary<string, object> Custom { get; set; }
+        }
+
+        public class AddressDTO
+        {
+            public string Address1 { get; set; }
+            public string Address2 { get; set; }
+            public string Address3 { get; set; }
+            public string Town { get; set; }
+            public string County { get; set; }
+            public string Postcode { get; set; }
+        }
+
+        public class CommitDataConverter : JsonConverter
+        {
+            public override bool CanConvert(Type objectType)
+            {
+                return objectType == typeof(CommitData);
+            }
+
+            public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+            {
+                return serializer.Deserialize(reader, objectType);
+            }
+
+            public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+            {
+                var obj = JObject.FromObject(value, serializer);
+                var propertiesToFlatten = obj.Properties()
+                    .Where(jp => jp.Value.Type == JTokenType.Object)
+                    .Select(jp => jp.Name);
+                foreach (var name in propertiesToFlatten)
+                {
+                    var prop = obj[name] as JObject;
+                    obj.Remove(name);
+                    foreach (var subProp in prop.Properties())
+                    {
+                        obj.Add(name + "." + subProp.Name, subProp.Value);
+                    }
+                }
+
+                serializer.Serialize(writer, obj);
+            }
+        }
+
+        public static void Test()
+        {
+            CommitData data = new CommitData
+            {
+                Property = new AddressDTO { Address1 = "", Address2 = "uyg" },
+                LenderRef = "yguyg",
+                Closed = DateTime.UtcNow
+            };
+            JsonSerializer js = new JsonSerializer();
+            js.NullValueHandling = NullValueHandling.Ignore;
+            StringBuilder sb = new StringBuilder();
+            StringWriter sw = new StringWriter(sb);
+            js.Serialize(sw, data);
+            Console.WriteLine(sb.ToString());
+        }
+    }
+
+    public class MyCode_14
+    {
+        [DataContract(Namespace = "", Name = "MyContract")]
+        public class MyContract
+        {
+            [DataMember(Name = "DCName")]
+            [XmlElement(ElementName = "XSName")]
+            public string Name { get; set; }
+            [DataMember(Name = "DCAge")]
+            [XmlElement(ElementName = "XSAge")]
+            public int Age { get; set; }
+        }
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            MyContract Echo(MyContract input);
+        }
+        public class Service : ITest
+        {
+            public MyContract Echo(MyContract input)
+            {
+                return input;
+            }
+        }
+        static void ReplaceSerializer(ServiceEndpoint endpoint)
+        {
+            Func<OperationDescription, IOperationBehavior> createSerializerBehavior = null;
+            switch (endpoint.Binding.Name)
+            {
+                case "usedatacontractserializer":
+                    createSerializerBehavior = od => new DataContractSerializerOperationBehavior(od);
+                    break;
+                case "usexmlserializer":
+                    createSerializerBehavior = od => new XmlSerializerOperationBehavior(od);
+                    break;
+                default:
+                    throw new ArgumentException("Unknown binding");
+            }
+
+            foreach (var operation in endpoint.Contract.Operations)
+            {
+                for (int i = 0; i < operation.Behaviors.Count; i++)
+                {
+                    if (operation.Behaviors[i] is DataContractSerializerOperationBehavior)
+                    {
+                        operation.Behaviors[i] = createSerializerBehavior(operation);
+                        break;
+                    }
+                }
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            var ep1 = host.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding() { Name = "usedatacontractserializer" }, "ep1");
+            var ep2 = host.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding() { Name = "usexmlserializer" }, "ep2");
+            ReplaceSerializer(ep1);
+            ReplaceSerializer(ep2);
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            var factory = new ChannelFactory<ITest>(new BasicHttpBinding { Name = "usedatacontractserializer" }, new EndpointAddress(baseAddress + "/ep1"));
+            ReplaceSerializer(factory.Endpoint);
+            ITest proxy = factory.CreateChannel();
+            var data = new MyContract { Name = "John Doe", Age = 33 };
+            proxy.Echo(data);
+
+            factory = new ChannelFactory<ITest>(new BasicHttpBinding { Name = "usexmlserializer" }, new EndpointAddress(baseAddress + "/ep2"));
+            ReplaceSerializer(factory.Endpoint);
+            proxy = factory.CreateChannel();
+            data = new MyContract { Name = "John Doe", Age = 33 };
+            proxy.Echo(data);
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/18086780/751090
+    public class StackOverflow_18086780
+    {
+        [ServiceContract]
+        public interface IService1
+        {
+            [OperationContract]
+            void MyOperation1();
+        }
+        [ServiceBehavior(InstanceContextMode = InstanceContextMode.PerSession, ConcurrencyMode = ConcurrencyMode.Multiple)]
+        public class service1 : IService1
+        {
+            public service1()
+            {
+                Console.WriteLine("creating instance");
+            }
+            public void MyOperation1()
+            {
+                Console.WriteLine("starting..");
+                Console.WriteLine(System.Threading.Thread.CurrentThread.ManagedThreadId);
+                Thread.Sleep(1000);
+                Console.WriteLine("Ending..");
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "net.tcp://localhost:8000/MyService";
+            ServiceHost host = new ServiceHost(typeof(service1), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(IService1), new NetTcpBinding(), "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            NetTcpBinding myBinding = new NetTcpBinding();
+            EndpointAddress myEndpoint = new EndpointAddress(baseAddress);
+            ChannelFactory<IService1> myChannelFactory = new ChannelFactory<IService1>(myBinding, myEndpoint);
+            IService1 instance = myChannelFactory.CreateChannel();
+            foreach (var b in myChannelFactory.Endpoint.Behaviors)
+            {
+                Console.WriteLine(b);
+            }
+
+            Thread[] t = new Thread[10];
+            for (int i = 0; i < t.Length; i++)
+            {
+                t[i] = new Thread(new ThreadStart(delegate()
+                {
+                    instance.MyOperation1();
+                }));
+            }
+
+            for (int i = 0; i < t.Length; i++)
+            {
+                t[i].Start();
+            }
+
+            for (int i = 0; i < t.Length; i++)
+            {
+                t[i].Join();
+            }
+
+            ((IClientChannel)instance).Close();
+            myChannelFactory.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/18081074/751090
+    public class StackOverflow_18081074
+    {
+        [DataContract]
+        public class Person
+        {
+            [DataMember(Name = "0")]
+            public string Foo1 { get; set; }
+            [DataMember(Name = "1")]
+            public string Foo2 { get; set; }
+            [DataMember(Name = "2")]
+            public string Foo3 { get; set; }
+        }
+        [ServiceContract]
+        public class Service
+        {
+            [WebGet]
+            public Person Get()
+            {
+                return new Person
+                {
+                    Foo1 = "bar1",
+                    Foo2 = "bar2",
+                    Foo3 = "bar3"
+                };
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            Console.WriteLine(c.DownloadString(baseAddress + "/Get"));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/18127665/751090
+    public class StackOverflow_18127665
+    {
+        public class WebAPINotificationAttribute : Attribute
+        {
+            public Type Type { get; set; }
+            public string Group { get; set; }
+        }
+        public class CSensor { }
+        public interface INotification { }
+        public interface IOpSerializable { }
+        public interface IBPMPackagedNotification { }
+        public interface ILanNotification { }
+        public interface ISensNotification { }
+        [Serializable]
+        [WebAPINotification(Type = typeof(CSensor), Group = "Sensor")]
+        public class SensorsStateModeNotification : SensorNotification, IBPMPackagedNotification { }
+
+        public abstract class SensorNotification : BasicLanNotification, ISensNotification { }
+
+        [Serializable]
+        public class BasicLanNotification : BasicNotification, ILanNotification { }
+
+        [Serializable]
+        public abstract class BasicNotification : INotification, ISerializable, IOpSerializable
+        {
+            long m_sentAt;
+            ENotificationGateway m_NotifyGateway;
+            [JsonIgnore]
+            public long SentAt
+            {
+                get
+                {
+                    return m_sentAt;
+                }
+                set
+                {
+                    m_sentAt = value;
+                }
+            }
+
+            /// <summary>
+            /// 
+            /// </summary>
+            [JsonIgnore]
+            public ENotificationGateway NotificationGateway
+            {
+                get
+                {
+                    return m_NotifyGateway;
+                }
+                set
+                {
+                    m_NotifyGateway = value;
+                }
+            }
+
+            #region ISerializable Members
+
+            public void GetObjectData(SerializationInfo info, StreamingContext context)
+            {
+                // Comment the lines below not to have this serialized
+                //info.AddValue("NotificationGateway", this.NotificationGateway);
+                info.AddValue("SentAt", this.SentAt);
+            }
+
+            #endregion
+        }
+        public enum ENotificationGateway { First, Second }
+        public static void Test()
+        {
+            BasicNotification msg = new BasicLanNotification
+            {
+                SentAt = 123,
+                NotificationGateway = ENotificationGateway.First
+            };
+            var str = JsonConvert.SerializeObject(
+                msg,
+                Newtonsoft.Json.Formatting.Indented,
+                new JsonSerializerSettings
+                {
+                    TypeNameHandling = TypeNameHandling.All
+                });
+            Console.WriteLine(str);
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_15887772.Test();
+            StackOverflow_18127665.Test();
         }
     }
 }

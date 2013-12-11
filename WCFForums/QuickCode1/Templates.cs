@@ -16,13 +16,13 @@ namespace QuickCode1
         public interface ITest
         {
             [OperationContract]
-            string Echo(string text);
+            int Add(int x, int y);
         }
         public class Service : ITest
         {
-            public string Echo(string text)
+            public int Add(int x, int y)
             {
-                return text;
+                return x + y;
             }
         }
         static Binding GetBinding()
@@ -40,7 +40,7 @@ namespace QuickCode1
 
             ChannelFactory<ITest> factory = new ChannelFactory<ITest>(GetBinding(), new EndpointAddress(baseAddress));
             ITest proxy = factory.CreateChannel();
-            Console.WriteLine(proxy.Echo("Hello"));
+            Console.WriteLine(proxy.Add(5, 8));
 
             ((IClientChannel)proxy).Close();
             factory.Close();
