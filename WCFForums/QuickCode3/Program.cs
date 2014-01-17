@@ -16183,11 +16183,138 @@ xmlns:xsd=""http://www.w3.org/2001/XMLSchema"">
         }
     }
 
+    // http://stackoverflow.com/q/20806241/751090
+    public class StackOverflow_20806241
+    {
+        public class Response<T> where T : class
+        {
+            public string MethodName { get; set; }
+            public int ResponseCode { get; set; }
+            public string ResponseMessage { get; set; }
+            public List<T> ResponseData { get; set; }
+        }
+        public class Announcement
+        {
+            public int AnnouncementId { get; set; }
+            public string AnnouncementTitle { get; set; }
+            public string CreatedBy { get; set; }
+            public string CreatedDate { get; set; }
+            public string DataShortVersion { get; set; }
+            public string ModifiedBy { get; set; }
+            public string ModifiedDate { get; set; }
+            public int SortIndex { get; set; }
+        }
+        public static void Test()
+        {
+            string JSON = @"{'MethodName':'m1','ResponseCode':1,'ResponseMessage':'msg','ResponseData':[
+                {'AnnouncementId':1,'AnnouncementTitle':'t1','CreatedBy':'c1','CreatedDate':'d1','DataShortVersion':'v1','ModifiedBy':'m1','ModifiedDate':'md1','SortIndex':1},
+                {'AnnouncementId':2,'AnnouncementTitle':'t2','CreatedBy':'c2','CreatedDate':'d2','DataShortVersion':'v2','ModifiedBy':'m2','ModifiedDate':'md2','SortIndex':2}
+            ]}";
+            JSON = JSON.Replace('\'', '\"');
+            MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(JSON));
+            DataContractJsonSerializer jsonSerializer;
+            jsonSerializer = new DataContractJsonSerializer(typeof(Response<Announcement>));
+            try
+            {
+                var objResponse = (Response<Announcement>)jsonSerializer.ReadObject(ms);
+                Console.WriteLine("Response:");
+                Console.WriteLine("  {0} - {1} - {2}", objResponse.MethodName, objResponse.ResponseCode, objResponse.ResponseMessage);
+                Console.WriteLine("  [{0}]", string.Join(", ", objResponse.ResponseData.Select(rd =>
+                    string.Format("{0}-{1}-{2}-{3}-{4}-{5}-{6}-{7}",
+                        rd.AnnouncementId, rd.AnnouncementTitle,
+                        rd.CreatedBy, rd.CreatedDate,
+                        rd.DataShortVersion, rd.ModifiedBy,
+                        rd.ModifiedDate, rd.SortIndex))));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error: {0}", ex);
+            }
+        }
+    }
+
+    // Removing the "http://schemas.microsoft.com/2003/10/Serialization/Arrays" namespace from the WSDL
+
+    public class MyCode_1
+    {
+        [DataContract(Name = "Person", Namespace = "http://my.namespace.com")]
+        public class Person
+        {
+            [DataMember]
+            public string Name { get; set; }
+            [DataMember]
+            public string[] Friends { get; set; }
+        }
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string[] GetFriends(Person p);
+        }
+
+        [CollectionDataContract(Name = "ArrayOfstring", ItemName = "string", Namespace = "http://my.namespace.com")]
+        public class ListOfString : List<string> { }
+        [DataContract(Name = "Person", Namespace = "http://my.namespace.com")]
+        public class Person2
+        {
+            [DataMember]
+            public string Name { get; set; }
+            [DataMember]
+            public ListOfString Friends { get; set; }
+        }
+        [ServiceContract(Name = "ITest")]
+        public interface ITest2
+        {
+            [OperationContract]
+            ListOfString GetFriends(Person2 p);
+        }
+
+        public class Service : ITest, ITest2
+        {
+            public string[] GetFriends(Person p)
+            {
+                return null;
+            }
+
+            ListOfString ITest2.GetFriends(Person2 p)
+            {
+                return null;
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding(), "");
+            host.Description.Behaviors.Add(new ServiceMetadataBehavior { HttpGetEnabled = true });
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            string wsdl = c.DownloadString(baseAddress + "?singleWsdl");
+            XElement xe = XElement.Parse(wsdl);
+            File.WriteAllText(@"C:\temp\a.txt", xe.ToString());
+
+            host.Close();
+            host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest2), new BasicHttpBinding(), "");
+            host.Description.Behaviors.Add(new ServiceMetadataBehavior { HttpGetEnabled = true });
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            c = new WebClient();
+            wsdl = c.DownloadString(baseAddress + "?singleWsdl");
+            xe = XElement.Parse(wsdl);
+            File.WriteAllText(@"C:\temp\b.txt", xe.ToString());
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_16674152.Test();
+            MyCode_1.Test();
         }
     }
 }
