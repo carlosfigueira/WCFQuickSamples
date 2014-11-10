@@ -26165,11 +26165,1102 @@ namespace QuickCode1
         }
     }
 
+    public class StackOverflow_23526051
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [WebInvoke(Method = "POST", UriTemplate = "/InsertContact", ResponseFormat = WebMessageFormat.Xml,
+              RequestFormat = WebMessageFormat.Xml, BodyStyle = WebMessageBodyStyle.Wrapped)]
+            int InsertContact(ContactType objContactType);
+        }
+        public class Service : ITest
+        {
+            public int InsertContact(ContactType objContactType)
+            {
+                Console.WriteLine("objContactType: {0}", objContactType);
+                return 0;
+            }
+        }
+
+        [DataContract(Name = "ContactType", Namespace = "")]
+        public class ContactType
+        {
+            [DataMember(Order = 1)]
+            public int ContactTypeID { get; set; }
+
+            [DataMember(Order = 2)]
+            public string Name { get; set; }
+
+            [DataMember(Order = 3)]
+            public string ModifiedDate { get; set; }
+
+            public override string ToString()
+            {
+                return string.Format("ContactType[Id={0},Name={1},ModifiedDate={2}]", ContactTypeID, Name, ModifiedDate);
+            }
+        }
+
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            c.Headers.Add(HttpRequestHeader.ContentType, "text/xml");
+            var xml = @"<t:objContactType>
+                <ContactTypeID>3</ContactTypeID>
+                <Name>Assistant Sales Representative</Name>
+                <ModifiedDate>2002-06-01T00:00:00</ModifiedDate>
+             </t:objContactType>";
+
+            xml = "<t:InsertContact xmlns:t=\"http://tempuri.org/\">" + xml + "</t:InsertContact>";
+
+            Console.WriteLine(c.UploadString(baseAddress + "/InsertContact", xml));
+            Console.WriteLine();
+
+            // To find out the request format: use the following 5 lines, look at Fiddler
+            var factory = new WebChannelFactory<ITest>(new Uri(baseAddress));
+            var proxy = factory.CreateChannel();
+            proxy.InsertContact(new ContactType { ContactTypeID = 123, ModifiedDate = "the date", Name = "John Doe" });
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/23529686/751090
+    public class StackOverflow_23529686
+    {
+        [ServiceContract]
+        public class Service
+        {
+            [OperationContract]
+            [WebInvoke(
+                Method = "POST",
+                BodyStyle = WebMessageBodyStyle.WrappedRequest, 
+                RequestFormat = WebMessageFormat.Json)]
+            public StatusMessage DoSomeWork(short myId, decimal latitude, decimal longitude, string someData)
+            {
+                return new StatusMessage
+                {
+                    Text = string.Format("id={0}, lat={1}, lon={2}, data={3}", myId, latitude, longitude, someData)
+                };
+            }
+        }
+        public class StatusMessage
+        {
+            public string Text { get; set; }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            c.Headers.Add(HttpRequestHeader.ContentType, "application/json");
+            var json = "{'someData':'hello','longitude':-56.78,'latitude':12.34,'myId':1}".Replace('\'', '\"');
+            Console.WriteLine(c.UploadString(baseAddress + "/DoSomeWork", json));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class PT_StackOverflow_17297
+    {
+        [DataContract(Name = "MinhaClasse", Namespace = "")]
+        public class MinhaClasse
+        {
+            [DataMember(EmitDefaultValue = false)]
+            public string Nome { get; set; }
+
+            [DataMember(EmitDefaultValue = false)]
+            public int Valor { get; set; }
+
+            [DataMember(EmitDefaultValue = false)]
+            public bool Flag { get; set; }
+        }
+        [ServiceContract]
+        public class Service
+        {
+            [WebGet(ResponseFormat = WebMessageFormat.Xml)]
+            public MinhaClasse Get()
+            {
+                var rndGen = new Random();
+                var result = new MinhaClasse();
+                result.Nome = rndGen.Next(2) == 0 ? "Alguma coisa" : null;
+                result.Valor = rndGen.Next(2) == 0 ? 123 : 0;
+                result.Flag = rndGen.Next(2) == 0;
+                return result;
+            }
+        }
+        public static void Test()
+        {
+            var baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            var host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            var c = new WebClient();
+            for (var i = 0; i < 5; i++)
+            {
+                Console.WriteLine(c.DownloadString(baseAddress + "/Get"));
+                Thread.Sleep(50);
+            }
+
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/24673714/751090
+    public class StackOverflow_24673714
+    {
+        const string XML = @"<ArrayOfCustomerData xmlns=""http://schemas.datacontract.org/2004/07/PACRM.QCT"">
+<CustomerData>
+<AccountID>String content ID 1</AccountID>
+<AccountName1>String content name 1</AccountName1>     
+</CustomerData>
+<CustomerData>
+<AccountID>String content ID 2</AccountID>
+<AccountName1>String content name 2</AccountName1>      
+</CustomerData>  
+</ArrayOfCustomerData>";
+
+        [DataContract(Name = "CustomerData", Namespace = "http://schemas.datacontract.org/2004/07/PACRM.QCT")]
+        public class CustomerData
+        {
+            [DataMember(IsRequired = true, Name = "AccountID")]
+            public string new_AccountID { get; set; }
+
+            [DataMember(IsRequired = true, Name = "AccountName1")]
+            public string new_accountname1 { get; set; }
+        }
+
+        public static void Test()
+        {
+            var ms = new MemoryStream();
+            var ws = new XmlWriterSettings { Indent = true, IndentChars = "  ", OmitXmlDeclaration = true, Encoding = Encoding.UTF8 };
+            var w = XmlWriter.Create(ms, ws);
+            var dcs = new DataContractSerializer(typeof(CustomerData[]));
+            var obj = new CustomerData[] { 
+                new CustomerData { new_AccountID = "String content 1", new_accountname1 = "String content 2" },
+                new CustomerData { new_AccountID = "String content 3", new_accountname1 = "String content 4" }
+            };
+            dcs.WriteObject(w, obj);
+            w.Flush();
+            Console.WriteLine(Encoding.UTF8.GetString(ms.ToArray()));
+
+            ms = new MemoryStream(Encoding.UTF8.GetBytes(XML));
+            var cds = (CustomerData[])dcs.ReadObject(ms);
+            Console.WriteLine(cds.Length);
+            foreach (var cd in cds)
+            {
+                Console.WriteLine(" {0} - {1}", cd.new_AccountID, cd.new_accountname1);
+            }
+        }
+    }
+
+    // Updating Content-Type of MTOM attachments
+    public class MyCode_15
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            void SendFile(byte[] file);
+        }
+
+        public class Service : ITest
+        {
+            public void SendFile(byte[] file)
+            {
+                Console.WriteLine("File sent");
+            }
+        }
+
+        public class MyNewMtomWriter : XmlDictionaryWriter
+        {
+            XmlDictionaryWriter inner;
+            public MyNewMtomWriter(XmlDictionaryWriter inner)
+            {
+                this.inner = inner;
+            }
+
+            public override void Close()
+            {
+                this.inner.Close();
+            }
+
+            public override void Flush()
+            {
+                this.inner.Flush();
+            }
+
+            public override string LookupPrefix(string ns)
+            {
+                return this.inner.LookupPrefix(ns);
+            }
+
+            public override void WriteBase64(byte[] buffer, int index, int count)
+            {
+                if (this.WriteState == System.Xml.WriteState.Element)
+                {
+                    this.inner.WriteStartAttribute("contentType", "http://www.w3.org/2005/05/xmlmime");
+                    this.inner.WriteValue("application/zip");
+                    this.inner.WriteEndAttribute();
+                }
+
+                this.inner.WriteBase64(buffer, index, count);
+            }
+
+            public override void WriteCData(string text)
+            {
+                this.inner.WriteCData(text);
+            }
+
+            public override void WriteCharEntity(char ch)
+            {
+                this.inner.WriteCharEntity(ch);
+            }
+
+            public override void WriteChars(char[] buffer, int index, int count)
+            {
+                this.inner.WriteChars(buffer, index, count);
+            }
+
+            public override void WriteComment(string text)
+            {
+                this.inner.WriteComment(text);
+            }
+
+            public override void WriteDocType(string name, string pubid, string sysid, string subset)
+            {
+                this.inner.WriteDocType(name, pubid, sysid, subset);
+            }
+
+            public override void WriteEndAttribute()
+            {
+                this.inner.WriteEndAttribute();
+            }
+
+            public override void WriteEndDocument()
+            {
+                this.inner.WriteEndDocument();
+            }
+
+            public override void WriteEndElement()
+            {
+                this.inner.WriteEndElement();
+            }
+
+            public override void WriteEntityRef(string name)
+            {
+                this.inner.WriteEntityRef(name);
+            }
+
+            public override void WriteFullEndElement()
+            {
+                this.inner.WriteFullEndElement();
+            }
+
+            public override void WriteProcessingInstruction(string name, string text)
+            {
+                this.inner.WriteProcessingInstruction(name, text);
+            }
+
+            public override void WriteRaw(string data)
+            {
+                this.inner.WriteRaw(data);
+            }
+
+            public override void WriteRaw(char[] buffer, int index, int count)
+            {
+                this.inner.WriteRaw(buffer, index, count);
+            }
+
+            public override void WriteStartAttribute(string prefix, string localName, string ns)
+            {
+                this.inner.WriteStartAttribute(prefix, localName, ns);
+            }
+
+            public override void WriteStartDocument(bool standalone)
+            {
+                this.inner.WriteStartDocument(standalone);
+            }
+
+            public override void WriteStartDocument()
+            {
+                this.inner.WriteStartDocument();
+            }
+
+            public override void WriteStartElement(string prefix, string localName, string ns)
+            {
+                this.inner.WriteStartElement(prefix, localName, ns);
+            }
+
+            public override System.Xml.WriteState WriteState
+            {
+                get { return this.inner.WriteState; }
+            }
+
+            public override void WriteString(string text)
+            {
+                this.inner.WriteString(text);
+            }
+
+            public override void WriteSurrogateCharEntity(char lowChar, char highChar)
+            {
+                this.inner.WriteSurrogateCharEntity(lowChar, highChar);
+            }
+
+            public override void WriteWhitespace(string ws)
+            {
+                this.inner.WriteWhitespace(ws);
+            }
+        }
+
+        class Constants
+        {
+            public const string BoundaryPropertyName = "boundary";
+            public const string StartInfoPropertyName = "startInfo";
+            public const string StartUriPropertyName = "startUri";
+        }
+        public class OutgoingEncoderInspector : IEndpointBehavior, IClientMessageInspector
+        {
+            public void AddBindingParameters(ServiceEndpoint endpoint, BindingParameterCollection bindingParameters)
+            {
+            }
+
+            public void ApplyClientBehavior(ServiceEndpoint endpoint, ClientRuntime clientRuntime)
+            {
+                clientRuntime.MessageInspectors.Add(this);
+            }
+
+            public void ApplyDispatchBehavior(ServiceEndpoint endpoint, EndpointDispatcher endpointDispatcher)
+            {
+            }
+
+            public void Validate(ServiceEndpoint endpoint)
+            {
+            }
+
+            public void AfterReceiveReply(ref Message reply, object correlationState)
+            {
+            }
+
+            public object BeforeSendRequest(ref Message request, IClientChannel channel)
+            {
+                string boundary = "uuid:" + Guid.NewGuid().ToString();
+                string startUri = "http://tempuri.org/0";
+                string startInfo = "text/xml";
+                string contentType = string.Format("multipart/related; type=\"application/xop+xml\";start=\"<{0}>\";boundary=\"{1}\";start-info=\"{2}\"",
+                    startUri, boundary, startInfo);
+                HttpRequestMessageProperty httpReq;
+                if (request.Properties.ContainsKey(HttpRequestMessageProperty.Name))
+                {
+                    httpReq = (HttpRequestMessageProperty)request.Properties[HttpRequestMessageProperty.Name];
+                }
+                else
+                {
+                    httpReq = new HttpRequestMessageProperty();
+                    request.Properties[HttpRequestMessageProperty.Name] = httpReq;
+                }
+
+                httpReq.Headers[HttpRequestHeader.ContentType] = contentType;
+                httpReq.Headers["MIME-Version"] = "1.0";
+
+                request.Properties[Constants.BoundaryPropertyName] = boundary;
+                request.Properties[Constants.StartInfoPropertyName] = startInfo;
+                request.Properties[Constants.StartUriPropertyName] = startUri;
+
+                return null;
+            }
+        }
+
+        public class MyEncoderBindingElement : MessageEncodingBindingElement
+        {
+            MessageEncodingBindingElement inner;
+
+            public MyEncoderBindingElement(MessageEncodingBindingElement inner)
+            {
+                this.inner = inner;
+            }
+
+            public override MessageEncoderFactory CreateMessageEncoderFactory()
+            {
+                return new MyEncoderFactory(inner.CreateMessageEncoderFactory());
+            }
+
+            public override MessageVersion MessageVersion
+            {
+                get { return this.inner.MessageVersion; }
+                set { this.inner.MessageVersion = value; }
+            }
+
+            public override BindingElement Clone()
+            {
+                return new MyEncoderBindingElement((MessageEncodingBindingElement)this.inner.Clone());
+            }
+
+            public override bool CanBuildChannelFactory<TChannel>(BindingContext context)
+            {
+                return context.CanBuildInnerChannelFactory<TChannel>();
+            }
+
+            public override IChannelFactory<TChannel> BuildChannelFactory<TChannel>(BindingContext context)
+            {
+                context.BindingParameters.Add(this);
+                return context.BuildInnerChannelFactory<TChannel>();
+            }
+
+            class MyEncoderFactory : MessageEncoderFactory
+            {
+                private MessageEncoderFactory inner;
+
+                public MyEncoderFactory(MessageEncoderFactory inner)
+                {
+                    this.inner = inner;
+                }
+
+                public override MessageEncoder Encoder
+                {
+                    get { return new MyEncoder(this.inner.Encoder); }
+                }
+
+                public override MessageVersion MessageVersion
+                {
+                    get { return this.inner.MessageVersion; }
+                }
+            }
+
+            class MyEncoder : MessageEncoder
+            {
+                private MessageEncoder inner;
+
+                public MyEncoder(MessageEncoder inner)
+                {
+                    this.inner = inner;
+                }
+
+                public override string ContentType
+                {
+                    get { return this.inner.ContentType; }
+                }
+
+                public override bool IsContentTypeSupported(string contentType)
+                {
+                    return this.inner.IsContentTypeSupported(contentType);
+                }
+
+                public override string MediaType
+                {
+                    get { return this.inner.MediaType; }
+                }
+
+                public override MessageVersion MessageVersion
+                {
+                    get { return this.inner.MessageVersion; }
+                }
+
+                public override Message ReadMessage(ArraySegment<byte> buffer, BufferManager bufferManager, string contentType)
+                {
+                    return this.inner.ReadMessage(buffer, bufferManager, contentType);
+                }
+
+                public override Message ReadMessage(Stream stream, int maxSizeOfHeaders, string contentType)
+                {
+                    throw new NotSupportedException();
+                }
+
+                public override ArraySegment<byte> WriteMessage(Message message, int maxMessageSize, BufferManager bufferManager, int messageOffset)
+                {
+                    var ms = new MemoryStream();
+                    string boundary = message.Properties[Constants.BoundaryPropertyName] as string;
+                    string startUri = message.Properties[Constants.StartUriPropertyName] as string;
+                    string startInfo = message.Properties[Constants.StartInfoPropertyName] as string;
+                    var w = XmlDictionaryWriter.CreateMtomWriter(ms, Encoding.UTF8, int.MaxValue, startInfo, boundary, startUri, false, false);
+                    w = new MyNewMtomWriter(w);
+                    message.WriteMessage(w);
+                    w.Flush();
+                    byte[] msBuffer = ms.ToArray();
+                    var buffer = bufferManager.TakeBuffer(messageOffset + msBuffer.Length);
+                    Buffer.BlockCopy(msBuffer, 0, buffer, messageOffset, msBuffer.Length);
+                    return new ArraySegment<byte>(buffer, messageOffset, msBuffer.Length);
+                }
+
+                public override void WriteMessage(Message message, Stream stream)
+                {
+                    throw new NotSupportedException();
+                }
+            }
+        }
+
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding { MessageEncoding = WSMessageEncoding.Mtom }, "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            CustomBinding clientBinding = new CustomBinding(new BasicHttpBinding { MessageEncoding = WSMessageEncoding.Mtom });
+            for (var i = 0; i < clientBinding.Elements.Count; i++)
+            {
+                var mebe = clientBinding.Elements[i] as MessageEncodingBindingElement;
+                if (mebe != null)
+                {
+                    clientBinding.Elements[i] = new MyEncoderBindingElement(mebe);
+                    break;
+                }
+            }
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(clientBinding, new EndpointAddress(baseAddress));
+            factory.Endpoint.Behaviors.Add(new OutgoingEncoderInspector());
+            ITest proxy = factory.CreateChannel();
+            byte[] file = Enumerable.Range(0, 800).Select(i => ((i % 80) == 79 ? (byte)0x0a : (byte)'r')).ToArray();
+            proxy.SendFile(file);
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+
+            var ms = new MemoryStream();
+            var w = XmlDictionaryWriter.CreateMtomWriter(ms, Encoding.UTF8, int.MaxValue, "text/xml");
+            w.WriteStartElement("foo");
+            w.WriteStartAttribute("contentType", "http://www.w3.org/2005/05/xmlmime");
+            w.WriteValue("application/zip");
+            w.WriteEndAttribute();
+            w.WriteBase64(file, 0, file.Length);
+            w.WriteEndElement();
+            w.Flush();
+            Console.WriteLine(Encoding.UTF8.GetString(ms.ToArray()));
+        }
+    }
+
+    // http://stackoverflow.com/q/25380450/751090
+    public class StackOverflow_25380450
+    {
+        [ServiceContract]
+        public class Service
+        {
+            [WebGet]
+            public int Add(int x, int y)
+            {
+                return x + y;
+            }
+        }
+
+        public class MyInspector : IDispatchMessageInspector, IEndpointBehavior
+        {
+            public const string LicenseHeaderName = "X-License";
+            public const string ExpectedLicense = "abcdef";
+
+            public object AfterReceiveRequest(ref Message request, IClientChannel channel, InstanceContext instanceContext)
+            {
+                HttpRequestMessageProperty reqProp = (HttpRequestMessageProperty)request.Properties[HttpRequestMessageProperty.Name];
+                var license = reqProp.Headers[LicenseHeaderName];
+                if (license != ExpectedLicense)
+                {
+                    throw new WebFaultException<string>("License required", HttpStatusCode.Forbidden);
+                }
+
+                return null;
+            }
+
+            public void BeforeSendReply(ref Message reply, object correlationState)
+            {
+            }
+
+            public void AddBindingParameters(ServiceEndpoint endpoint, BindingParameterCollection bindingParameters)
+            {
+            }
+
+            public void ApplyClientBehavior(ServiceEndpoint endpoint, ClientRuntime clientRuntime)
+            {
+            }
+
+            public void ApplyDispatchBehavior(ServiceEndpoint endpoint, EndpointDispatcher endpointDispatcher)
+            {
+                endpointDispatcher.DispatchRuntime.MessageInspectors.Add(this);
+            }
+
+            public void Validate(ServiceEndpoint endpoint)
+            {
+            }
+        }
+
+        public static string SendGet(string uri, Dictionary<string, string> headers)
+        {
+            string responseBody = null;
+
+            HttpWebRequest req = (HttpWebRequest)HttpWebRequest.Create(uri);
+            req.Method = "GET";
+            if (headers != null)
+            {
+                foreach (string headerName in headers.Keys)
+                {
+                    switch (headerName)
+                    {
+                        case "Accept":
+                            req.Accept = headers[headerName];
+                            break;
+                        default:
+                            req.Headers[headerName] = headers[headerName];
+                            break;
+                    }
+                }
+            }
+
+            HttpWebResponse resp;
+            try
+            {
+                resp = (HttpWebResponse)req.GetResponse();
+            }
+            catch (WebException e)
+            {
+                resp = (HttpWebResponse)e.Response;
+            }
+
+            if (resp == null)
+            {
+                responseBody = null;
+                Console.WriteLine("Response is null");
+            }
+            else
+            {
+                Console.WriteLine("HTTP/{0} {1} {2}", resp.ProtocolVersion, (int)resp.StatusCode, resp.StatusDescription);
+                foreach (string headerName in resp.Headers.AllKeys)
+                {
+                    Console.WriteLine("{0}: {1}", headerName, resp.Headers[headerName]);
+                }
+                Console.WriteLine();
+                Stream respStream = resp.GetResponseStream();
+                if (respStream != null)
+                {
+                    responseBody = new StreamReader(respStream).ReadToEnd();
+                    Console.WriteLine(responseBody);
+                }
+                else
+                {
+                    Console.WriteLine("HttpWebResponse.GetResponseStream returned null");
+                }
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*  ");
+            Console.WriteLine();
+
+            return responseBody;
+        }
+
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            var endpoint = host.AddServiceEndpoint(typeof(Service), new WebHttpBinding(), "");
+            endpoint.Behaviors.Add(new WebHttpBehavior { AutomaticFormatSelectionEnabled = true });
+            endpoint.Behaviors.Add(new MyInspector());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            Console.WriteLine("No license:");
+            Dictionary<string, string> headers = new Dictionary<string, string>
+            {
+                { "Accept", "application/json" }
+            };
+            SendGet(baseAddress + "/Add?x=6&y=8", headers);
+
+            Console.WriteLine("Incorrect license:");
+            headers.Add(MyInspector.LicenseHeaderName, "incorrect");
+            SendGet(baseAddress + "/Add?x=6&y=8", headers);
+
+            headers[MyInspector.LicenseHeaderName] = MyInspector.ExpectedLicense;
+            SendGet(baseAddress + "/Add?x=6&y=8", headers);
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/25377059/751090
+    public class StackOverflow_25377059
+    {
+        [ServiceContract]
+        public interface ITestService
+        {
+            [OperationContract]
+            [WebInvoke(Method = "POST",
+             ResponseFormat = WebMessageFormat.Json,
+             BodyStyle = WebMessageBodyStyle.Bare,
+             UriTemplate = "/test")]
+            string Test(Stream body);
+        }
+
+        public class Service : ITestService
+        {
+            public string Test(Stream body)
+            {
+                return new StreamReader(body).ReadToEnd();
+            }
+        }
+
+        class RawMapper : WebContentTypeMapper
+        {
+            public override WebContentFormat GetMessageFormatForContentType(string contentType)
+            {
+                return WebContentFormat.Raw;
+            }
+        }
+
+        public static void Test()
+        {
+            var baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            var host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            var binding = new WebHttpBinding { ContentTypeMapper = new RawMapper() };
+            host.AddServiceEndpoint(typeof(ITestService), binding, "").Behaviors.Add(new WebHttpBehavior());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            var req = (HttpWebRequest)HttpWebRequest.Create(baseAddress + "/test");
+            req.Method = "POST";
+            req.ContentType = "application/json";
+            var reqStream = req.GetRequestStream();
+            var body = "a test message";
+            var bodyBytes = new UTF8Encoding(false).GetBytes(body);
+            reqStream.Write(bodyBytes, 0, bodyBytes.Length);
+            reqStream.Close();
+            var resp = (HttpWebResponse)req.GetResponse();
+            Console.WriteLine("HTTP/{0} {1} {2}", resp.ProtocolVersion, (int)resp.StatusCode, resp.StatusDescription);
+            foreach (var header in resp.Headers.AllKeys)
+            {
+                Console.WriteLine("{0}: {1}", header, resp.Headers[header]);
+            }
+
+            Console.WriteLine();
+            Console.WriteLine(new StreamReader(resp.GetResponseStream()).ReadToEnd());
+            Console.WriteLine();
+        }
+    }
+
+    class MyCode_16
+    {
+        [DataContract(Name = "MockBlob", Namespace = "")]
+        public class MockBlob
+        {
+            [DataMember]
+            public string Name;
+
+            [DataMember(EmitDefaultValue = false)]
+            public NameValueCollection Metadata;
+        }
+
+        [ServiceContract]
+        public interface ITest
+        {
+            [WebGet]
+            MockBlob GetBlob(string include);
+        }
+
+        public class Service : ITest
+        {
+            public MockBlob GetBlob(string include)
+            {
+                var result = new MockBlob();
+                result.Name = "The name";
+                if (include == "metadata")
+                {
+                    result.Metadata = new NameValueCollection();
+                    result.Metadata.Add("foo", "bar");
+                    result.Metadata.Add("foz", "baz");
+                }
+
+                return result;
+            }
+        }
+
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            Console.WriteLine(c.DownloadString(baseAddress + "/GetBlob"));
+            Console.WriteLine();
+            Console.WriteLine(c.DownloadString(baseAddress + "/GetBlob?include=metadata"));
+            Console.WriteLine();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    class MyCode_17
+    {
+        [DataContract(Name = "Foo", Namespace = "")]
+        public class Foo
+        {
+            [DataMember]
+            public Dictionary<string, string> Bar;
+
+            public Foo()
+            {
+                Bar = new Dictionary<string, string>();
+                Bar.Add("metadata1", "value1");
+                Bar.Add("metadata2", "value2");
+            }
+        }
+
+        [ServiceContract]
+        public class Service
+        {
+            [WebGet(ResponseFormat = WebMessageFormat.Xml)]
+            public Foo Get()
+            {
+                return new Foo();
+            }
+        }
+
+        class DictionarySurrogate : IXmlSerializable
+        {
+            Dictionary<string, string> dict;
+
+            public DictionarySurrogate(Dictionary<string, string> dict)
+            {
+                this.dict = dict;
+            }
+            
+            public XmlSchema GetSchema()
+            {
+                return null;
+            }
+
+            public void ReadXml(XmlReader reader)
+            {
+                throw new NotSupportedException("This type can be used for serialization only");
+            }
+
+            public void WriteXml(XmlWriter writer)
+            {
+                foreach (var key in this.dict.Keys)
+                {
+                    writer.WriteElementString(key, this.dict[key]);
+                }
+            }
+        }
+
+        class MySurrogate : IDataContractSurrogate
+        {
+            public object GetCustomDataToExport(Type clrType, Type dataContractType)
+            {
+                throw new NotSupportedException("unused");
+            }
+
+            public object GetCustomDataToExport(MemberInfo memberInfo, Type dataContractType)
+            {
+                throw new NotSupportedException("unused");
+            }
+
+            public Type GetDataContractType(Type type)
+            {
+                if (type == typeof(Dictionary<string, string>))
+                {
+                    return typeof(DictionarySurrogate);
+                }
+                else
+                {
+                    return type;
+                }
+            }
+
+            public object GetDeserializedObject(object obj, Type targetType)
+            {
+                return obj;
+            }
+
+            public void GetKnownCustomDataTypes(Collection<Type> customDataTypes)
+            {
+                throw new NotSupportedException("unused");
+            }
+
+            public object GetObjectToSerialize(object obj, Type targetType)
+            {
+                var dict = obj as Dictionary<string, string>;
+                if (dict != null)
+                {
+                    return new DictionarySurrogate(dict);
+                }
+                else
+                {
+                    return obj;
+                }
+            }
+
+            public Type GetReferencedTypeOnImport(string typeName, string typeNamespace, object customData)
+            {
+                throw new NotSupportedException("unused");
+            }
+
+            public CodeTypeDeclaration ProcessImportedType(CodeTypeDeclaration typeDeclaration, CodeCompileUnit compileUnit)
+            {
+                throw new NotSupportedException("unused");
+            }
+        }
+
+        private static void DefineSurrogate(ServiceEndpoint endpoint)
+        {
+            foreach (var operation in endpoint.Contract.Operations)
+            {
+                var dcsob = operation.Behaviors.Find<DataContractSerializerOperationBehavior>();
+                if (dcsob != null)
+                {
+                    dcsob.DataContractSurrogate = new MySurrogate();
+                }
+            }
+        }
+
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            ServiceEndpoint endpoint = host.AddServiceEndpoint(typeof(Service), new WebHttpBinding(), "");
+            endpoint.Behaviors.Add(new WebHttpBehavior());
+            DefineSurrogate(endpoint);
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            Console.WriteLine(c.DownloadString(baseAddress + "/Get"));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://pt.stackoverflow.com/questions/39646
+    class PtStackOverflow_39646
+    {
+        [DataContract(Name = "Issue", Namespace = "http://www.nobre.com.br/")]
+        [KnownType(typeof(AgriculturalIssue))]
+        public class Issue
+        {
+            public virtual Guid IssueId { get; set; }
+
+            [DataMember(Order = 3)]
+            public virtual Detail Detail { get; set; }
+        }
+
+        [DataContract(Name = "AgriculturalIssue", Namespace = "http://www.nobre.com.br/")]
+        public class AgriculturalIssue : Detail
+        {
+            public virtual Guid AgriculturalIssueId { get; set; }
+
+            public virtual Guid AgriculturalCultureId { get; set; }
+
+            public virtual Guid AgriculturalCoverageLevelId { get; set; }
+
+        }
+
+        [DataContract(Name = "Detail", Namespace = "http://www.nobre.com.br/")]
+        [KnownType(typeof(AgriculturalIssue))]
+        public class Detail : IDetail
+        {
+        }
+
+        public interface IDetail
+        {
+        }
+
+        [ServiceContract(Name = "IAgriculturalIssueService", Namespace = "http://www.nobre.com.br/")]
+        public interface IAgriculturalIssueService
+        {
+            [OperationContract]
+            void Sync([MessageParameter(Name = "Issue")] Issue issue);
+
+            [OperationContract]
+            Issue Get(Guid id);
+        }
+
+        public class AgriculturalIssueService : IAgriculturalIssueService
+        {
+            static Issue sIssue;
+
+            public void Sync(Issue issue)
+            {
+                sIssue = issue;
+                Console.WriteLine("Sync[issue detail = {0}]", issue.Detail == null ?
+                    "<<NULL>>" : issue.Detail.GetType().FullName);
+            }
+
+            public Issue Get(Guid id)
+            {
+                var issue = new Issue();
+                issue.IssueId = id;
+                var agriculturalIssue = new AgriculturalIssue();
+                issue.Detail = agriculturalIssue;
+                return issue;
+            }
+        }
+
+        static Binding GetBinding()
+        {
+            var result = new BasicHttpBinding();
+            return result;
+        }
+
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(AgriculturalIssueService), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(IAgriculturalIssueService), GetBinding(), "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            var factory = new ChannelFactory<IAgriculturalIssueService>(GetBinding(), new EndpointAddress(baseAddress));
+            var proxy = factory.CreateChannel();
+            Issue issue = new Issue {
+                IssueId = Guid.NewGuid(),
+                Detail = new AgriculturalIssue
+                {
+                    AgriculturalCoverageLevelId = Guid.NewGuid(),
+                    AgriculturalCultureId = Guid.NewGuid(),
+                    AgriculturalIssueId = Guid.NewGuid()
+                }
+            };
+
+            proxy.Sync(issue);
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            StackOverflow_18127665.Test();
+            PtStackOverflow_39646.Test();
         }
     }
 }

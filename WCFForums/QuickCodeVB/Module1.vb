@@ -1353,11 +1353,52 @@ Public Class StackOverflow_17956746
     End Sub
 End Class
 
+Public Class Post_41bd6f73_cb01_4428_8bc4_cb53a427abc0
+    <ServiceContract()> _
+    Public Interface ITest
+        <OperationContract()> _
+        <WebInvoke(Method:="POST",
+                   BodyStyle:=WebMessageBodyStyle.Wrapped,
+                   ResponseFormat:=WebMessageFormat.Json,
+                   UriTemplate:="GetPlaces1")>
+        Function GetPlaces1(ByVal value As List(Of String)) As List(Of Common_DataContract_Place)
+    End Interface
+
+    Public Class Common_DataContract_Place
+        Public Property Value As String
+    End Class
+
+    Public Class Service
+        Implements ITest
+
+        Public Function Add(ByVal value As List(Of String)) As List(Of Common_DataContract_Place) Implements ITest.GetPlaces1
+            Dim result As List(Of Common_DataContract_Place) = New List(Of Common_DataContract_Place)
+            Dim place = New Common_DataContract_Place
+            place.Value = "('" & String.Join("', '", value) & "')"
+            result.Add(place)
+            Return result
+        End Function
+    End Class
+
+    Public Shared Sub Test()
+        Dim baseAddress As String = "http://" + Environment.MachineName + ":8000/Service"
+        Dim host As WebServiceHost = New WebServiceHost(GetType(Service), New Uri(baseAddress))
+        host.Open()
+        Console.WriteLine("Host opened")
+
+        Dim client As WebClient = New WebClient()
+        client.Headers(HttpRequestHeader.ContentType) = "application/json"
+        Dim body = "{""value"":[""value1"",""value2"",""value3""]}"
+        Console.WriteLine(client.UploadString(baseAddress + "/GetPlaces1", body))
+
+        host.Close()
+    End Sub
+End Class
 
 Module Module1
 
     Sub Main()
-        StackOverflow_17956746.Test()
+        Post_41bd6f73_cb01_4428_8bc4_cb53a427abc0.Test()
     End Sub
 
 End Module
