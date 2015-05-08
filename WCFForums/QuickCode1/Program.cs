@@ -27256,11 +27256,202 @@ namespace QuickCode1
         }
     }
 
+    // http://stackoverflow.com/q/29825519/751090
+    public class StackOverflow_29825519
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string WhoAmI();
+        }
+        public class Service : ITest
+        {
+            string name;
+
+            public Service(string name)
+            {
+                this.name = name;
+            }
+
+            public string WhoAmI()
+            {
+                return this.name;
+            }
+        }
+        class MyBehavior : IServiceBehavior, IInstanceProvider
+        {
+            public void AddBindingParameters(ServiceDescription serviceDescription, ServiceHostBase serviceHostBase, Collection<ServiceEndpoint> endpoints, BindingParameterCollection bindingParameters)
+            {
+            }
+
+            public void ApplyDispatchBehavior(ServiceDescription serviceDescription, ServiceHostBase serviceHostBase)
+            {
+                foreach (ChannelDispatcher cd in serviceHostBase.ChannelDispatchers)
+                {
+                    foreach (EndpointDispatcher ed in cd.Endpoints)
+                    {
+                        ed.DispatchRuntime.InstanceProvider = this;
+                    }
+                }
+            }
+
+            public void Validate(ServiceDescription serviceDescription, ServiceHostBase serviceHostBase)
+            {
+            }
+
+            public object GetInstance(InstanceContext instanceContext, Message message)
+            {
+                return this.GetInstance(instanceContext);
+            }
+
+            public object GetInstance(InstanceContext instanceContext)
+            {
+                return new Service("John Doe");
+            }
+
+            public void ReleaseInstance(InstanceContext instanceContext, object instance)
+            {
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding(), "");
+            host.Description.Behaviors.Add(new MyBehavior());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(new BasicHttpBinding(), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+            Console.WriteLine("WhoAmI: {0}", proxy.WhoAmI());
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://pt.stackoverflow.com/q/62782/7804
+    public class Pt_StackOverflow_62782
+    {
+        [DataContract(Name = "DADOS", Namespace = "")]
+        public class DadosJson
+        {
+            public DateTime? DtNascimento = null;
+            [DataMember(EmitDefaultValue = false, Name = "NASCIMENTO")]
+            private string WireDtNascimento
+            {
+                set { /* nao usado */ }
+                get
+                {
+                    if (this.DtNascimento == null)
+                    {
+                        return "";
+                    }
+                    else
+                    {
+                        var millis = (long)this.DtNascimento.Value.ToUniversalTime()
+                            .Subtract(new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc))
+                            .TotalMilliseconds;
+                        var offset = this.DtNascimento.Value.Kind == DateTimeKind.Utc ?
+                            "" :
+                            this.DtNascimento.Value.ToString("%K").Replace(":", "");
+                        return "/Date(" + millis + offset + ")/";
+                    }
+                }
+            }
+        }
+        [DataContract(Name = "DADOS", Namespace = "")]
+        public class DadosXml
+        {
+            public DateTime? DtNascimento = null;
+            [DataMember(EmitDefaultValue = false, Name = "NASCIMENTO")]
+            private string WireDtNascimento
+            {
+                set { /* nao usado */ }
+                get
+                {
+                    return this.DtNascimento == null ?
+                        "" :
+                        this.DtNascimento.Value.ToString("yyyy-MM-dd'T'HH:mm:ss.fffK");
+                }
+            }
+        }
+        [ServiceContract]
+        public interface IRestService
+        {
+            [OperationContract(Name = "ConsultaDadosXml")]
+            [WebGet(ResponseFormat = WebMessageFormat.Xml, BodyStyle = WebMessageBodyStyle.Bare, UriTemplate = "ConsultaDados/xml?token={token}")]
+            DadosXml ConsultaDadosXml(string token);
+
+            [OperationContract(Name = "ConsultaDadosJson")]
+            [WebGet(ResponseFormat = WebMessageFormat.Json, BodyStyle = WebMessageBodyStyle.Bare, UriTemplate = "ConsultaDados/json?token={token}")]
+            DadosJson ConsultaDadosJson(string token);
+        }
+        public class Service : IRestService
+        {
+            public DadosXml ConsultaDadosXml(string token)
+            {
+                var result = new DadosXml();
+                if (!"NULL".Equals(token, StringComparison.OrdinalIgnoreCase))
+                {
+                    result.DtNascimento = DateTime.Now;
+                }
+
+                return result;
+            }
+
+            public DadosJson ConsultaDadosJson(string token)
+            {
+                return new DadosJson
+                {
+                    DtNascimento =  ConsultaDadosXml(token).DtNascimento
+                };
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            ServiceEndpoint endpoint = host.AddServiceEndpoint(typeof(IRestService), new WebHttpBinding(), "");
+            endpoint.Behaviors.Add(new WebHttpBehavior());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            Console.WriteLine("XML, not null");
+            Console.WriteLine(c.DownloadString(baseAddress + "/ConsultaDados/xml?token=not%20null"));
+            Console.WriteLine();
+
+            Console.WriteLine("XML, null");
+            Console.WriteLine(c.DownloadString(baseAddress + "/ConsultaDados/xml?token=null"));
+            Console.WriteLine();
+
+            Console.WriteLine("JSON, not null");
+            Console.WriteLine(c.DownloadString(baseAddress + "/ConsultaDados/json?token=not%20null"));
+            Console.WriteLine();
+
+            Console.WriteLine("JSON, null");
+            Console.WriteLine(c.DownloadString(baseAddress + "/ConsultaDados/json?token=null"));
+            Console.WriteLine();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+
     class Program
     {
         static void Main(string[] args)
         {
-            PtStackOverflow_39646.Test();
+            Pt_StackOverflow_62782.Test();
         }
     }
 }
