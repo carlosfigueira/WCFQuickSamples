@@ -27446,12 +27446,173 @@ namespace QuickCode1
         }
     }
 
+    public class StackOverflow_31184719
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [WebGet(UriTemplate = "/foo?id={Id}&flags={flags}&filter={filter}", ResponseFormat = WebMessageFormat.Xml, BodyStyle = WebMessageBodyStyle.Wrapped)]
+            [OperationContract]
+            string GetFoo(string id, FlaggedEnum flags, SomeClass filter = null);
+        }
+        [Flags]
+        public enum FlaggedEnum
+        {
+            [EnumMember]
+            Book = 1,
+            [EnumMember]
+            Product = 2,
+            [EnumMember]
+            TenorGroup = 4,
+            [EnumMember]
+            Tenor = 8,
+            [EnumMember]
+            Trade = 16
+        }
+        public class SomeClass
+        {
+            public string SomeProperty{ get; set; }
+        }
+        public class MyWebHttpBehavior : WebHttpBehavior
+        {
+            //protected override QueryStringConverter GetQueryStringConverter(OperationDescription operationDescription)
+            //{
+            //    return new MyConverter(base.GetQueryStringConverter(operationDescription));
+            //}
+
+            class MyConverter : QueryStringConverter
+            {
+                QueryStringConverter inner;
+                public MyConverter(QueryStringConverter inner)
+                {
+                    this.inner = inner;
+                }
+
+                public override bool CanConvert(Type type)
+                {
+                    return type == typeof(SomeClass) || this.inner.CanConvert(type);
+                }
+
+                public override object ConvertStringToValue(string parameter, Type parameterType)
+                {
+                    if (parameterType == typeof(SomeClass))
+                    {
+                        return new SomeClass { SomeProperty = parameter };
+                    }
+                    else
+                    {
+                        return base.ConvertStringToValue(parameter, parameterType);
+                    }
+                }
+            }
+        }
+        public class Service : ITest
+        {
+            public string GetFoo(string id, FlaggedEnum flags, SomeClass filter = null)
+            {
+                return string.Format("{0} - {1} - {2}", id, flags, filter == null ? "<<NULL>>" : filter.SomeProperty);
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            ServiceEndpoint endpoint = host.AddServiceEndpoint(typeof(ITest), new WebHttpBinding(), "");
+            endpoint.Behaviors.Add(new MyWebHttpBehavior());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            //WebClient c = new WebClient();
+            Util.SendRequest(baseAddress + "/foo?id=MyId&flags=Book,Product&filter=MyFilter", "GET", null, null);
+            //Console.WriteLine(c.DownloadString(baseAddress + "/foo?id=MyId&flags=Book&filter=MyFilter"));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/31541498/751090
+    public class StackOverflow_31541498
+    {
+        class ConnectionBusiness
+        {
+            List<string> errors = new List<string>();
+            public void ObtenerTicket(string user, string password, string db)
+            {
+                errors.Add(string.Format("ObtenerTicket called: {0}, {1}, {2}", user, password, db));
+            }
+            public List<string> MyErrors
+            {
+                get
+                {
+                    var result = new List<string>(this.errors);
+                    errors.Clear();
+                    if (result.Count == 0)
+                    {
+                        result.Add("No errors!");
+                    }
+                    return result;
+                }
+            }
+        }
+        [ServiceContract(SessionMode = SessionMode.Required)]
+        public interface IOhmio_Security
+        {
+            [OperationContract]
+            void Connect(string user, string password, string db);
+            [OperationContract]
+            List<string> GetErrors();
+        }
+        [ServiceBehavior(InstanceContextMode = InstanceContextMode.PerSession)]
+        public class OhmioSVC : IOhmio_Security
+        {
+            private ConnectionBusiness _conn = new ConnectionBusiness();
+            public void Connect(string user, string password, string db)
+            {
+                _conn.ObtenerTicket(user, password, db);
+            }
+
+            public List<string> GetErrors()
+            {
+                return _conn.MyErrors;
+            }
+        }
+        static Binding GetBinding()
+        {
+            // var result = new BasicHttpBinding(); // This will not work, as it doesn't support sessions
+            var result = new WSHttpBinding(); // This will work
+            return result;
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(OhmioSVC), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(IOhmio_Security), GetBinding(), "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            var factory = new ChannelFactory<IOhmio_Security>(GetBinding(), new EndpointAddress(baseAddress));
+            var proxy = factory.CreateChannel();
+
+            proxy.Connect("user", "pwd", "db");
+            var errors = proxy.GetErrors();
+            Console.WriteLine("Errors:\n   {0}", string.Join("\n   ", errors));
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
 
     class Program
     {
         static void Main(string[] args)
         {
-            Pt_StackOverflow_62782.Test();
+            StackOverflow_31541498.Test();
         }
     }
 }
