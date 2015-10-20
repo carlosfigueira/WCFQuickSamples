@@ -27612,7 +27612,7 @@ namespace QuickCode1
     {
         static void Main(string[] args)
         {
-            StackOverflow_31541498.Test();
+            WsdlTemplate.Test();
         }
     }
 }
