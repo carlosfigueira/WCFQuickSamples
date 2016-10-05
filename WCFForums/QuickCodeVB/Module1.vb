@@ -1395,10 +1395,27 @@ Public Class Post_41bd6f73_cb01_4428_8bc4_cb53a427abc0
     End Sub
 End Class
 
+Public Class SOPT_93859
+
+    Public Shared Sub Test()
+        Dim v_list As New List(Of String)(New String() {"a", "b", "c"})
+        Dim v_contains As Boolean
+
+        v_contains = v_list.Any(Function(x) x.Equals("A", StringComparison.OrdinalIgnoreCase))
+        Console.WriteLine("Contains: {0}", v_contains)
+
+        Dim v_set = New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+        v_set.Add("a")
+        v_set.Add("b")
+        v_set.Add("c")
+        Console.WriteLine("Contains (HashSet): {0}", v_set.Contains("A"))
+    End Sub
+End Class
+
 Module Module1
 
     Sub Main()
-        Post_41bd6f73_cb01_4428_8bc4_cb53a427abc0.Test()
+        SOPT_93859.Test()
     End Sub
 
 End Module

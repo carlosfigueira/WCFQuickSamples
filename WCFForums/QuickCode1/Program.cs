@@ -27608,11 +27608,1280 @@ namespace QuickCode1
         }
     }
 
+    public class MyCode_18
+    {
+        [ServiceContract]
+        public class Service
+        {
+            [WebGet]
+            public async Task<int> Add(int x, int y)
+            {
+                OperationContext ctx = OperationContext.Current;
+                await Task.Delay(1000);
+                using (new OperationContextScope(ctx))
+                {
+                    WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.Accepted;
+                }
+                return x + y;
+            }
+        }
+        static void SendGetRequest(string uri)
+        {
+            HttpWebRequest req = (HttpWebRequest)HttpWebRequest.Create(uri);
+            req.Method = "GET";
+            HttpWebResponse resp;
+            try
+            {
+                resp = (HttpWebResponse)req.GetResponse();
+            }
+            catch (WebException e)
+            {
+                resp = (HttpWebResponse)e.Response;
+            }
+
+            Console.WriteLine("HTTP/{0} {1} {2}", resp.ProtocolVersion, (int)resp.StatusCode, resp.StatusDescription);
+            foreach (string headerName in resp.Headers.AllKeys)
+            {
+                Console.WriteLine("{0}: {1}", headerName, resp.Headers[headerName]);
+            }
+            Console.WriteLine();
+            Stream respStream = resp.GetResponseStream();
+            if (respStream != null)
+            {
+                Console.WriteLine(new StreamReader(respStream).ReadToEnd());
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*  ");
+            Console.WriteLine();
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(Service), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            SendGetRequest(baseAddress + "/Add?x=6&y=8");
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class PT_StackOverflow_101381
+    {
+        static readonly string BaseAddress = "http://" + Environment.MachineName + ":8000/Service";
+
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            string GetValue();
+        }
+
+        public class Service : ITest
+        {
+            public string GetValue()
+            {
+                XElement xe = new XElement("publicacoes.publicacoes",
+                    new XElement("publicacao",
+                        new XElement("tipo", "Tribunal de Justiça de Minas Gerais"),
+                        new XElement("comarca", "COMARCA DE BELO HORIZONTE"),
+                        new XElement("competencia", "2ª FAZ. MUNICIPAL")));
+                return xe.ToString();
+            }
+        }
+
+        public class CustomTextMessageEncoder : MessageEncoder
+        {
+            private CustomTextMessageEncoderFactory factory;
+            private XmlWriterSettings writerSettings;
+            private string contentType;
+
+            public CustomTextMessageEncoder(CustomTextMessageEncoderFactory factory)
+            {
+                this.factory = factory;
+
+                this.writerSettings = new XmlWriterSettings();
+                this.writerSettings.Encoding = Encoding.GetEncoding(factory.CharSet);
+                //this.contentType = string.Format("{0}; charset={1}",
+                //    this.factory.MediaType, this.writerSettings.Encoding.HeaderName);
+                this.contentType = this.factory.MediaType; // not adding charset
+            }
+
+            public override string ContentType
+            {
+                get
+                {
+                    return this.contentType;
+                }
+            }
+
+            public override string MediaType
+            {
+                get
+                {
+                    return factory.MediaType;
+                }
+            }
+
+            public override MessageVersion MessageVersion
+            {
+                get
+                {
+                    return this.factory.MessageVersion;
+                }
+            }
+
+            public override Message ReadMessage(ArraySegment<byte> buffer, BufferManager bufferManager, string contentType)
+            {
+                byte[] msgContents = new byte[buffer.Count];
+                Array.Copy(buffer.Array, buffer.Offset, msgContents, 0, msgContents.Length);
+                bufferManager.ReturnBuffer(buffer.Array);
+
+                MemoryStream stream = new MemoryStream(msgContents);
+                return ReadMessage(stream, int.MaxValue);
+            }
+
+            public override Message ReadMessage(Stream stream, int maxSizeOfHeaders, string contentType)
+            {
+                XmlReader reader = XmlReader.Create(stream);
+                return Message.CreateMessage(reader, maxSizeOfHeaders, this.MessageVersion);
+            }
+
+            public override ArraySegment<byte> WriteMessage(Message message, int maxMessageSize, BufferManager bufferManager, int messageOffset)
+            {
+                MemoryStream stream = new MemoryStream();
+                XmlWriter writer = XmlWriter.Create(stream, this.writerSettings);
+                message.WriteMessage(writer);
+                writer.Close();
+
+                byte[] messageBytes = stream.GetBuffer();
+                int messageLength = (int)stream.Position;
+                stream.Close();
+
+                int totalLength = messageLength + messageOffset;
+                byte[] totalBytes = bufferManager.TakeBuffer(totalLength);
+                Array.Copy(messageBytes, 0, totalBytes, messageOffset, messageLength);
+
+                ArraySegment<byte> byteArray = new ArraySegment<byte>(totalBytes, messageOffset, messageLength);
+                return byteArray;
+            }
+
+            public override void WriteMessage(Message message, Stream stream)
+            {
+                XmlWriter writer = XmlWriter.Create(stream, this.writerSettings);
+                message.WriteMessage(writer);
+                writer.Close();
+            }
+        }
+
+        public class CustomTextMessageEncoderFactory : MessageEncoderFactory
+        {
+            private MessageEncoder encoder;
+            private MessageVersion version;
+            private string mediaType;
+            private string charSet;
+
+            internal CustomTextMessageEncoderFactory(string mediaType, string charSet,
+                MessageVersion version)
+            {
+                this.version = version;
+                this.mediaType = mediaType;
+                this.charSet = charSet;
+                this.encoder = new CustomTextMessageEncoder(this);
+            }
+
+            public override MessageEncoder Encoder
+            {
+                get
+                {
+                    return this.encoder;
+                }
+            }
+
+            public override MessageVersion MessageVersion
+            {
+                get
+                {
+                    return this.version;
+                }
+            }
+
+            internal string MediaType
+            {
+                get
+                {
+                    return this.mediaType;
+                }
+            }
+
+            internal string CharSet
+            {
+                get
+                {
+                    return this.charSet;
+                }
+            }
+        }
+
+        public class CustomTextMessageBindingElement : MessageEncodingBindingElement
+        {
+            private MessageVersion msgVersion;
+            private string mediaType;
+            private string encoding;
+            private XmlDictionaryReaderQuotas readerQuotas;
+
+            CustomTextMessageBindingElement(CustomTextMessageBindingElement binding)
+                : this(binding.Encoding, binding.MediaType, binding.MessageVersion)
+            {
+                this.readerQuotas = new XmlDictionaryReaderQuotas();
+                binding.ReaderQuotas.CopyTo(this.readerQuotas);
+            }
+
+            public CustomTextMessageBindingElement(string encoding, string mediaType,
+                MessageVersion msgVersion)
+            {
+                if (encoding == null)
+                    throw new ArgumentNullException("encoding");
+
+                if (mediaType == null)
+                    throw new ArgumentNullException("mediaType");
+
+                if (msgVersion == null)
+                    throw new ArgumentNullException("msgVersion");
+
+                this.msgVersion = msgVersion;
+                this.mediaType = mediaType;
+                this.encoding = encoding;
+                this.readerQuotas = new XmlDictionaryReaderQuotas();
+            }
+
+            public CustomTextMessageBindingElement(string encoding, string mediaType)
+                : this(encoding, mediaType, MessageVersion.Soap11WSAddressing10)
+            {
+            }
+
+            public CustomTextMessageBindingElement(string encoding)
+                : this(encoding, "text/xml")
+            {
+
+            }
+
+            public CustomTextMessageBindingElement()
+                : this("UTF-8")
+            {
+            }
+
+            public override MessageVersion MessageVersion
+            {
+                get
+                {
+                    return this.msgVersion;
+                }
+
+                set
+                {
+                    if (value == null)
+                        throw new ArgumentNullException("value");
+                    this.msgVersion = value;
+                }
+            }
+
+
+            public string MediaType
+            {
+                get
+                {
+                    return this.mediaType;
+                }
+
+                set
+                {
+                    if (value == null)
+                        throw new ArgumentNullException("value");
+                    this.mediaType = value;
+                }
+            }
+
+            public string Encoding
+            {
+                get
+                {
+                    return this.encoding;
+                }
+
+                set
+                {
+                    if (value == null)
+                        throw new ArgumentNullException("value");
+                    this.encoding = value;
+                }
+            }
+
+            // This encoder does not enforces any quotas for the unsecure messages. The 
+            // quotas are enforced for the secure portions of messages when this encoder
+            // is used in a binding that is configured with security. 
+            public XmlDictionaryReaderQuotas ReaderQuotas
+            {
+                get
+                {
+                    return this.readerQuotas;
+                }
+            }
+
+            #region IMessageEncodingBindingElement Members
+
+            public override MessageEncoderFactory CreateMessageEncoderFactory()
+            {
+                return new CustomTextMessageEncoderFactory(this.MediaType,
+                    this.Encoding, this.MessageVersion);
+            }
+
+            #endregion
+
+
+            public override BindingElement Clone()
+            {
+                return new CustomTextMessageBindingElement(this);
+            }
+
+            public override IChannelFactory<TChannel> BuildChannelFactory<TChannel>(BindingContext context)
+            {
+                if (context == null)
+                    throw new ArgumentNullException("context");
+
+                context.BindingParameters.Add(this);
+                return context.BuildInnerChannelFactory<TChannel>();
+            }
+
+            public override bool CanBuildChannelFactory<TChannel>(BindingContext context)
+            {
+                if (context == null)
+                    throw new ArgumentNullException("context");
+
+                return context.CanBuildInnerChannelFactory<TChannel>();
+            }
+
+            public override IChannelListener<TChannel> BuildChannelListener<TChannel>(BindingContext context)
+            {
+                if (context == null)
+                    throw new ArgumentNullException("context");
+
+                context.BindingParameters.Add(this);
+                return context.BuildInnerChannelListener<TChannel>();
+            }
+
+            public override bool CanBuildChannelListener<TChannel>(BindingContext context)
+            {
+                if (context == null)
+                    throw new ArgumentNullException("context");
+
+                context.BindingParameters.Add(this);
+                return context.CanBuildInnerChannelListener<TChannel>();
+            }
+
+            public override T GetProperty<T>(BindingContext context)
+            {
+                if (typeof(T) == typeof(XmlDictionaryReaderQuotas))
+                {
+                    return (T)(object)this.readerQuotas;
+                }
+                else
+                {
+                    return base.GetProperty<T>(context);
+                }
+            }
+        }
+
+        public class IIFServiceservice : ClientBase<ITest>, ITest
+        {
+            public IIFServiceservice()
+                : base(GetBinding(), new EndpointAddress(BaseAddress))
+            {
+
+            }
+
+            static Binding GetBinding()
+            {
+                CustomBinding result = new CustomBinding(new BasicHttpBinding());
+                for (int i = 0; i < result.Elements.Count; i++)
+                {
+                    MessageEncodingBindingElement mebe = result.Elements[i] as MessageEncodingBindingElement;
+                    if (mebe != null)
+                    {
+                        result.Elements[i] = new CustomTextMessageBindingElement("iso-8859-1", "text/xml", mebe.MessageVersion);
+                        break;
+                    }
+                }
+
+                return result;
+            }
+
+            public string GetValue()
+            {
+                return base.Channel.GetValue();
+            }
+        }
+
+        public static void Test()
+        {
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(BaseAddress));
+            host.AddServiceEndpoint(typeof(ITest), new BasicHttpBinding(), "");
+            host.Open();
+
+            IIFServiceservice c = new IIFServiceservice();
+            Console.WriteLine(c.GetValue());
+            Console.WriteLine("Press enter to continue");
+            Console.ReadLine();
+            c.Close();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/35750073/751090
+    public class StackOverflow_35750073
+    {
+        [ServiceContract]
+        public class Service
+        {
+            [OperationContract]
+            [WebInvoke(Method = "POST", UriTemplate = "data")]
+            public Stream GetData(Stream iBody)
+            {
+                StreamReader objReader = new StreamReader(iBody);
+                string strBody = objReader.ReadToEnd();
+
+                XmlDocument objDoc = new XmlDocument();
+                objDoc.LoadXml(strBody);
+
+                return GetStreamData("Hello There. " + objDoc.InnerText);
+            }
+            private Stream GetStreamData(string iContent)
+            {
+                byte[] resultBytes = Encoding.UTF8.GetBytes(iContent);
+                return new MemoryStream(resultBytes);
+            }
+        }
+        class RawMapper : WebContentTypeMapper
+        {
+            public override WebContentFormat GetMessageFormatForContentType(string contentType)
+            {
+                return WebContentFormat.Raw;
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            ServiceEndpoint endpoint1 = host.AddServiceEndpoint(
+                typeof(Service),
+                new WebHttpBinding { ContentTypeMapper = new RawMapper() },
+                "withMapper");
+            endpoint1.Behaviors.Add(new WebHttpBehavior());
+
+            ServiceEndpoint endpoint2 = host.AddServiceEndpoint(
+                typeof(Service), 
+                new WebHttpBinding(),
+                "noMapper");
+            endpoint2.Behaviors.Add(new WebHttpBehavior());
+
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            var input = "<hello><world>How are you?</world></hello>";
+            Console.WriteLine("Using a Content-Type mapper:");
+            SendRequest(baseAddress + "/withMapper/data", "POST", "text/xml", input);
+            SendRequest(baseAddress + "/withMapper/data", "POST", null, input);
+
+            Console.WriteLine("Without using a Content-Type mapper:");
+            SendRequest(baseAddress + "/noMapper/data", "POST", "text/xml", input);
+            SendRequest(baseAddress + "/noMapper/data", "POST", null, input);
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+        public static string SendRequest(string uri, string method, string contentType, string body)
+        {
+            string responseBody = null;
+
+            HttpWebRequest req = (HttpWebRequest)HttpWebRequest.Create(uri);
+            req.Method = method;
+            if (!String.IsNullOrEmpty(contentType))
+            {
+                req.ContentType = contentType;
+            }
+
+            if (body != null)
+            {
+                byte[] bodyBytes = Encoding.UTF8.GetBytes(body);
+                req.GetRequestStream().Write(bodyBytes, 0, bodyBytes.Length);
+                req.GetRequestStream().Close();
+            }
+
+            HttpWebResponse resp;
+            try
+            {
+                resp = (HttpWebResponse)req.GetResponse();
+            }
+            catch (WebException e)
+            {
+                resp = (HttpWebResponse)e.Response;
+            }
+
+            if (resp == null)
+            {
+                responseBody = null;
+                Console.WriteLine("Response is null");
+            }
+            else
+            {
+                Console.WriteLine("HTTP/{0} {1} {2}", resp.ProtocolVersion, (int)resp.StatusCode, resp.StatusDescription);
+                foreach (string headerName in resp.Headers.AllKeys)
+                {
+                    Console.WriteLine("{0}: {1}", headerName, resp.Headers[headerName]);
+                }
+                Console.WriteLine();
+                Stream respStream = resp.GetResponseStream();
+                if (respStream != null)
+                {
+                    responseBody = new StreamReader(respStream).ReadToEnd();
+                    Console.WriteLine(responseBody);
+                }
+                else
+                {
+                    Console.WriteLine("HttpWebResponse.GetResponseStream returned null");
+                }
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*  ");
+            Console.WriteLine();
+
+            return responseBody;
+        }
+    }
+
+    public class PT_StackOverflow_116368
+    {
+        const string JSON = @"{
+            ""champions"":[
+                {""id"":266,""active"":true,""botEnabled"":false,""freeToPlay"":true,""botMmEnabled"":false,""rankedPlayEnabled"":true},
+                {""id"":201,""active"":true,""botEnabled"":false,""freeToPlay"":true,""botMmEnabled"":false,""rankedPlayEnabled"":true},
+                {""id"":51,""active"":true,""botEnabled"":true,""freeToPlay"":true,""botMmEnabled"":true,""rankedPlayEnabled"":true},
+                {""id"":86,""active"":true,""botEnabled"":true,""freeToPlay"":true,""botMmEnabled"":true,""rankedPlayEnabled"":true},
+                {""id"":74,""active"":true,""botEnabled"":false,""freeToPlay"":true,""botMmEnabled"":false,""rankedPlayEnabled"":true},
+                {""id"":222,""active"":true,""botEnabled"":false,""freeToPlay"":true,""botMmEnabled"":false,""rankedPlayEnabled"":true},
+                {""id"":55,""active"":true,""botEnabled"":false,""freeToPlay"":true,""botMmEnabled"":false,""rankedPlayEnabled"":true},
+                {""id"":64,""active"":true,""botEnabled"":false,""freeToPlay"":true,""botMmEnabled"":false,""rankedPlayEnabled"":true},
+                {""id"":111,""active"":true,""botEnabled"":false,""freeToPlay"":true,""botMmEnabled"":false,""rankedPlayEnabled"":true},
+                {""id"":76,""active"":true,""botEnabled"":true,""freeToPlay"":true,""botMmEnabled"":true,""rankedPlayEnabled"":true},
+                {""id"":112,""active"":true,""botEnabled"":false,""freeToPlay"":true,""botMmEnabled"":false,""rankedPlayEnabled"":true}
+            ]
+        }";
+
+        public class Champions
+        {
+            public int Id { get; set; }
+
+            public bool BotEnabled { get; set; }
+        }
+
+        public class ChampionsList
+        {
+            public List<Champions> Champions { get; set; }
+        }
+
+        public static void Test()
+        {
+            var list = JsonConvert.DeserializeObject<ChampionsList>(JSON);
+            foreach (var champion in list.Champions)
+            {
+                Console.WriteLine("{0} - {1}", champion.Id, champion.BotEnabled);
+            }
+        }
+    }
+
+    // http://stackoverflow.com/questions/35921627/wcf-post-method-body-parameter-form-data
+    public class StackOverflow_35921627
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            [WebInvoke(BodyStyle = WebMessageBodyStyle.WrappedRequest, ResponseFormat = WebMessageFormat.Json)]
+            string Login(string host, string user, string pass, string applicationId);
+        }
+
+        public class Service : ITest
+        {
+            public string Login(string host, string user, string pass, string applicationId)
+            {
+                return string.Format("Login result: {0} - {1} - {2} - {3}", host, user, pass, applicationId);
+            }
+        }
+
+        public class MyWebHttpBehavior : WebHttpBehavior
+        {
+            protected override IDispatchMessageFormatter GetRequestDispatchFormatter(OperationDescription operationDescription, ServiceEndpoint endpoint)
+            {
+                var originalFormatter = base.GetRequestDispatchFormatter(operationDescription, endpoint);
+                return new FormDataDispatchFormatter(operationDescription, originalFormatter);
+            }
+        }
+
+        public class FormDataDispatchFormatter : IDispatchMessageFormatter
+        {
+            IDispatchMessageFormatter originalFormatter;
+            Dictionary<string, int> parameterNames;
+
+            public FormDataDispatchFormatter(OperationDescription operation, IDispatchMessageFormatter originalFormatter)
+            {
+                var inputMessageBodyParts = operation.Messages[0].Body.Parts;
+                this.parameterNames = new Dictionary<string, int>();
+                for (int i = 0; i < inputMessageBodyParts.Count; i++)
+                {
+                    if (inputMessageBodyParts[i].Type == typeof(string))
+                    {
+                        // For now, only support string parameters; others will be ignored
+                        this.parameterNames.Add(inputMessageBodyParts[i].Name, i);
+                    }
+                }
+
+                this.originalFormatter = originalFormatter;
+            }
+
+
+            public void DeserializeRequest(Message message, object[] parameters)
+            {
+                object httpRequestProperty;
+                if (!message.Properties.TryGetValue(HttpRequestMessageProperty.Name, out httpRequestProperty))
+                {
+                    throw new InvalidOperationException("This formatter can only be used with HTTP");
+                }
+
+                var contentType = ((HttpRequestMessageProperty)httpRequestProperty).Headers[HttpRequestHeader.ContentType];
+                if (contentType == null || !contentType.StartsWith("application/x-www-form-urlencoded"))
+                {
+                    this.originalFormatter.DeserializeRequest(message, parameters);
+                    return;
+                }
+
+                object bodyFormatProperty;
+                if (!message.Properties.TryGetValue(WebBodyFormatMessageProperty.Name, out bodyFormatProperty) ||
+                    (bodyFormatProperty as WebBodyFormatMessageProperty).Format != WebContentFormat.Raw)
+                {
+                    throw new InvalidOperationException("Incoming messages must have a body format of Raw. Is a ContentTypeMapper set on the WebHttpBinding?");
+                }
+
+                XmlDictionaryReader bodyReader = message.GetReaderAtBodyContents();
+                bodyReader.ReadStartElement("Binary");
+                byte[] rawBody = bodyReader.ReadContentAsBase64();
+                MemoryStream ms = new MemoryStream(rawBody);
+                StreamReader sr = new StreamReader(ms);
+                string formData = sr.ReadToEnd();
+
+                string[] parts = formData.Split('&');
+                foreach (var part in parts)
+                {
+                    // TODO: handle url-decoding
+
+                    var kvp = part.Split('=');
+                    if (kvp.Length != 2)
+                    {
+                        throw new InvalidOperationException("Only support simple parameters for now");
+                    }
+
+                    int index;
+                    if (this.parameterNames.TryGetValue(kvp[0], out index))
+                    {
+                        parameters[index] = kvp[1];
+                    }
+                }
+            }
+
+            public Message SerializeReply(MessageVersion messageVersion, object[] parameters, object result)
+            {
+                throw new NotSupportedException("This is a request-only formatter");
+            }
+        }
+
+        internal static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            ServiceEndpoint endpoint = host.AddServiceEndpoint(typeof(ITest), new WebHttpBinding(), "");
+            endpoint.Behaviors.Add(new MyWebHttpBehavior());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            SendPostRequest(baseAddress + "/Login", "application/x-www-form-urlencoded", "host=myHost&user=myUser&pass=myPassword&applicationId=app123");
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+
+        static void SendPostRequest(string url, string contentType, string body)
+        {
+            HttpWebRequest req = HttpWebRequest.CreateHttp(url);
+            req.Method = "POST";
+            req.ContentType = contentType;
+            byte[] bodyBytes = Encoding.UTF8.GetBytes(body);
+            Stream reqStream = req.GetRequestStream();
+            reqStream.Write(bodyBytes, 0, bodyBytes.Length);
+            reqStream.Close();
+
+            HttpWebResponse resp;
+            try
+            {
+                resp = (HttpWebResponse)req.GetResponse();
+            }
+            catch (WebException ex)
+            {
+                resp = (HttpWebResponse)ex.Response;
+            }
+
+            if (resp == null)
+            {
+                Console.WriteLine("Response is null");
+            }
+            else
+            {
+                Console.WriteLine("HTTP/{0} {1} {2}", resp.ProtocolVersion, (int)resp.StatusCode, resp.StatusDescription);
+                foreach (string headerName in resp.Headers.AllKeys)
+                {
+                    Console.WriteLine("{0}: {1}", headerName, resp.Headers[headerName]);
+                }
+                Console.WriteLine();
+                Stream respStream = resp.GetResponseStream();
+                if (respStream != null)
+                {
+                    Console.WriteLine(new StreamReader(respStream).ReadToEnd());
+                }
+                else
+                {
+                    Console.WriteLine("HttpWebResponse.GetResponseStream returned null");
+                }
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*  ");
+            Console.WriteLine();
+        }
+    }
+
+    public class StackOverflow_36918281
+    {
+        [DataContract] public class ObjectToBeReturned
+        {
+            [DataMember]
+            public string A { get; set; }
+            [DataMember]
+            public string B { get; set; }
+        }
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract, WebGet(ResponseFormat = WebMessageFormat.Json)]
+            ObjectToBeReturned Test();
+        }
+        public class Service : ITest
+        {
+            public ObjectToBeReturned Test()
+            {
+                return new ObjectToBeReturned { A = "atest", B = "btest" };
+            }
+        }
+        public class MyJsonWrapperInspector : IEndpointBehavior, IDispatchMessageInspector
+        {
+            public void AddBindingParameters(ServiceEndpoint endpoint, BindingParameterCollection bindingParameters)
+            {
+            }
+
+            public object AfterReceiveRequest(ref Message request, IClientChannel channel, InstanceContext instanceContext)
+            {
+                return null;
+            }
+
+            public void ApplyClientBehavior(ServiceEndpoint endpoint, ClientRuntime clientRuntime)
+            {
+            }
+
+            public void ApplyDispatchBehavior(ServiceEndpoint endpoint, EndpointDispatcher endpointDispatcher)
+            {
+                endpointDispatcher.DispatchRuntime.MessageInspectors.Add(this);
+            }
+
+            public void BeforeSendReply(ref Message reply, object correlationState)
+            {
+                object propValue;
+                if (reply.Properties.TryGetValue(WebBodyFormatMessageProperty.Name, out propValue) &&
+                    ((WebBodyFormatMessageProperty)propValue).Format == WebContentFormat.Json)
+                {
+                    XmlDocument doc = new XmlDocument();
+                    doc.Load(reply.GetReaderAtBodyContents());
+                    var newRoot = doc.CreateElement("root");
+                    SetTypeAttribute(doc, newRoot, "object");
+
+                    var status = doc.CreateElement("status");
+                    SetTypeAttribute(doc, status, "string");
+                    status.AppendChild(doc.CreateTextNode("success"));
+                    newRoot.AppendChild(status);
+
+                    var newData = doc.CreateElement("data");
+                    SetTypeAttribute(doc, newData, "object");
+                    newRoot.AppendChild(newData);
+
+                    var data = doc.DocumentElement;
+                    var toCopy = new List<XmlNode>();
+                    foreach (XmlNode child in data.ChildNodes)
+                    {
+                        toCopy.Add(child);
+                    }
+
+                    foreach (var child in toCopy)
+                    {
+                        newData.AppendChild(child);
+                    }
+
+                    Console.WriteLine(newRoot.OuterXml);
+
+                    var newReply = Message.CreateMessage(reply.Version, reply.Headers.Action, new XmlNodeReader(newRoot));
+                    foreach (var propName in reply.Properties.Keys)
+                    {
+                        newReply.Properties.Add(propName, reply.Properties[propName]);
+                    }
+
+                    reply = newReply;
+                }
+            }
+
+            private void SetTypeAttribute(XmlDocument doc, XmlElement element, string value)
+            {
+                var attr = element.Attributes["type"];
+                if (attr == null)
+                {
+                    attr = doc.CreateAttribute("type");
+                    attr.Value = value;
+                    element.Attributes.Append(attr);
+                }
+                else
+                {
+                    attr.Value = value;
+                }
+            }
+
+            public void Validate(ServiceEndpoint endpoint)
+            {
+            }
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            string baseAddressTcp = "net.tcp://" + Environment.MachineName + ":8888/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress), new Uri(baseAddressTcp));
+            var ep1 = host.AddServiceEndpoint(typeof(ITest), new NetTcpBinding(), "");
+            var ep2 = host.AddServiceEndpoint(typeof(ITest), new WebHttpBinding(), "");
+            ep2.EndpointBehaviors.Add(new WebHttpBehavior());
+            ep2.EndpointBehaviors.Add(new MyJsonWrapperInspector());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            Console.WriteLine("TCP:");
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(new NetTcpBinding(), new EndpointAddress(baseAddressTcp));
+            ITest proxy = factory.CreateChannel();
+            Console.WriteLine(proxy.Test());
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+
+            Console.WriteLine();
+            Console.WriteLine("Web:");
+            WebClient c = new WebClient();
+            Console.WriteLine(c.DownloadString(baseAddress + "/Test"));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/37187563/751090
+    public class StackOverflow_37187563
+    {
+        [XmlRoot(ElementName = "data", Namespace = "")]
+        public class Data
+        {
+            [XmlAttribute(AttributeName = "contentType")]
+            public string ContentType { get; set; }
+            [XmlAttribute(AttributeName = "contentLength")]
+            public int ContentLength { get; set; }
+            [XmlElement]
+            public XmlCDataSection MyCData
+            {
+                get { return new XmlDocument().CreateCDataSection(this.Value); }
+                set { this.Value = value.Value; }
+            }
+            [XmlIgnore]
+            public string Value { get; set; }
+        }
+
+        [ServiceContract]
+        public class MyService
+        {
+            [WebGet(ResponseFormat = WebMessageFormat.Xml), XmlSerializerFormat]
+            public Data PingServer()
+            {
+                return new Data
+                {
+                    ContentLength = 24,
+                    ContentType = "text/plain",
+                    Value = "OK - 12/05/2016 14:45:40"
+                };
+            }
+        }
+
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            WebServiceHost host = new WebServiceHost(typeof(MyService), new Uri(baseAddress));
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            Console.WriteLine(c.DownloadString(baseAddress + "/PingServer"));
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    // http://stackoverflow.com/q/37597194/751090
+    public class StackOverflow_37597194
+    {
+        [ServiceContract]
+        public interface ITest
+        {
+            [WebInvoke(Method = "POST",
+                UriTemplate = "/payload",
+                RequestFormat = WebMessageFormat.Json,
+                ResponseFormat = WebMessageFormat.Json,
+                BodyStyle = WebMessageBodyStyle.Bare)]
+            string payload(RequestPayload jsondata);
+        }
+        [DataContract]
+        public class RequestPayload
+        {
+            [DataMember(Name = "_links")]
+            public RequestPayloadLinks Links { get; set; }
+            [DataMember(Name = "currency")]
+            public string Currency { get; set; }
+            [DataMember(Name = "status")]
+            public string Status { get; set; }
+            [DataMember(Name = "total")]
+            public double Total { get; set; }
+        }
+        [DataContract] public class LinkObject
+        {
+            [DataMember(Name = "href")]
+            public string Href { get; set; }
+        }
+        [DataContract]
+        public class RequestPayloadLinks
+        {
+            [DataMember(Name = "self")]
+            public LinkObject Self { get; set; }
+            [DataMember(Name = "warehouse")]
+            public LinkObject Warehouse { get; set; }
+            [DataMember(Name = "invoice")]
+            public LinkObject Invoice { get; set; }
+        }
+        public class Service : ITest
+        {
+            public string payload(RequestPayload jsondata)
+            {
+                return string.Format("{0} - {1} {2}", jsondata.Status, jsondata.Total, jsondata.Currency);
+            }
+        }
+        public class JsonHalMapper : WebContentTypeMapper
+        {
+            public override WebContentFormat GetMessageFormatForContentType(string contentType)
+            {
+                if (contentType.StartsWith("application/hal+json"))
+                {
+                    return WebContentFormat.Json;
+                }
+                else
+                {
+                    return WebContentFormat.Default;
+                }
+            }
+        }
+
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            var endpoint = host.AddServiceEndpoint(typeof(ITest), new WebHttpBinding { ContentTypeMapper = new JsonHalMapper() }, "");
+            endpoint.EndpointBehaviors.Add(new WebHttpBehavior());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            WebClient c = new WebClient();
+            var requestData = @"   {
+                '_links': {
+                    'self': { 'href': '/orders/523' },
+                    'warehouse': { 'href': '/warehouse/56' },
+                    'invoice': { 'href': '/invoices/873' }
+                },
+                'currency': 'USD',
+                'status': 'shipped',
+                'total': 10.20
+            }".Replace('\'', '\"');
+            Console.WriteLine(requestData);
+            c.Headers[HttpRequestHeader.ContentType] = "application/hal+json";
+            try
+            {
+                var response = c.UploadString(baseAddress + "/payload", "POST", requestData);
+                Console.WriteLine(response);
+            }
+            catch (WebException ex)
+            {
+                Console.WriteLine("Exception: {0}", ex);
+            }
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
+    public class StackOverflow_39082986
+    {
+        const string TimestampPropertyName = "MyTimestampProperty";
+        class MyTimestampProperty
+        {
+            public DateTime EncoderTimestamp;
+            public DateTime InspectorTimestamp;
+        }
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract]
+            void DoSomething();
+        }
+        public class Service : ITest
+        {
+            public void DoSomething()
+            {
+                var myProp = (MyTimestampProperty)OperationContext.Current.IncomingMessageProperties[TimestampPropertyName];
+                var now = DateTime.UtcNow;
+                Console.WriteLine("Request timestamps:");
+                var timeFormat = "yyyy-MM-dd HH:MM:ss.fffffff";
+                Console.WriteLine("  From encoder  : {0}", myProp.EncoderTimestamp.ToString(timeFormat));
+                Console.WriteLine("  From inspector: {0}", myProp.InspectorTimestamp.ToString(timeFormat));
+                Console.WriteLine("  From operation: {0}", now.ToString(timeFormat));
+            }
+        }
+        class MyInspector : IEndpointBehavior, IDispatchMessageInspector
+        {
+            public void AddBindingParameters(ServiceEndpoint endpoint, BindingParameterCollection bindingParameters)
+            {
+            }
+
+            public object AfterReceiveRequest(ref Message request, IClientChannel channel, InstanceContext instanceContext)
+            {
+                MyTimestampProperty prop;
+                if (request.Properties.ContainsKey(TimestampPropertyName))
+                {
+                    prop = (MyTimestampProperty)request.Properties[TimestampPropertyName];
+                }
+                else
+                {
+                    prop = new MyTimestampProperty();
+                    request.Properties.Add(TimestampPropertyName, prop);
+                }
+
+                prop.InspectorTimestamp = DateTime.UtcNow;
+                return null;
+            }
+
+            public void ApplyClientBehavior(ServiceEndpoint endpoint, ClientRuntime clientRuntime)
+            {
+            }
+
+            public void ApplyDispatchBehavior(ServiceEndpoint endpoint, EndpointDispatcher endpointDispatcher)
+            {
+                endpointDispatcher.DispatchRuntime.MessageInspectors.Add(this);
+            }
+
+            public void BeforeSendReply(ref Message reply, object correlationState)
+            {
+            }
+
+            public void Validate(ServiceEndpoint endpoint)
+            {
+            }
+        }
+        public class MyEncoderBindingElement : MessageEncodingBindingElement
+        {
+            private MessageEncodingBindingElement inner;
+            public MyEncoderBindingElement(MessageEncodingBindingElement inner)
+            {
+                this.inner = inner;
+            }
+            public override MessageVersion MessageVersion
+            {
+                get { return this.inner.MessageVersion; }
+                set { this.inner.MessageVersion = value; }
+            }
+
+            public override BindingElement Clone()
+            {
+                return new MyEncoderBindingElement((MessageEncodingBindingElement)this.inner.Clone());
+            }
+
+            public override MessageEncoderFactory CreateMessageEncoderFactory()
+            {
+                return new MyEncoderFactory(this.inner.CreateMessageEncoderFactory());
+            }
+
+            public override bool CanBuildChannelListener<TChannel>(BindingContext context)
+            {
+                return context.CanBuildInnerChannelListener<TChannel>();
+            }
+
+            public override IChannelListener<TChannel> BuildChannelListener<TChannel>(BindingContext context)
+            {
+                context.BindingParameters.Add(this);
+                return context.BuildInnerChannelListener<TChannel>();
+            }
+
+            class MyEncoderFactory : MessageEncoderFactory
+            {
+                MessageEncoderFactory inner;
+                public MyEncoderFactory(MessageEncoderFactory inner)
+                {
+                    this.inner = inner;
+                }
+
+                public override MessageEncoder Encoder
+                {
+                    get
+                    {
+                        return new MyEncoder(this.inner.Encoder);
+                    }
+                }
+
+                public override MessageVersion MessageVersion
+                {
+                    get { return this.inner.MessageVersion; }
+                }
+            }
+
+            class MyEncoder : MessageEncoder
+            {
+                MessageEncoder inner;
+                public MyEncoder(MessageEncoder inner)
+                {
+                    this.inner = inner;
+                }
+
+                public override string ContentType
+                {
+                    get { return this.inner.ContentType; }
+                }
+
+                public override string MediaType
+                {
+                    get { return this.inner.MediaType; }
+                }
+
+                public override MessageVersion MessageVersion
+                {
+                    get { return this.inner.MessageVersion; }
+                }
+
+                public override bool IsContentTypeSupported(string contentType)
+                {
+                    return this.inner.IsContentTypeSupported(contentType);
+                }
+
+                public override Message ReadMessage(ArraySegment<byte> buffer, BufferManager bufferManager, string contentType)
+                {
+                    var result = this.inner.ReadMessage(buffer, bufferManager, contentType);
+                    result.Properties.Add(TimestampPropertyName, new MyTimestampProperty { EncoderTimestamp = DateTime.UtcNow });
+                    return result;
+                }
+
+                public override Message ReadMessage(Stream stream, int maxSizeOfHeaders, string contentType)
+                {
+                    var result = this.inner.ReadMessage(stream, maxSizeOfHeaders, contentType);
+                    result.Properties.Add(TimestampPropertyName, new MyTimestampProperty { EncoderTimestamp = DateTime.UtcNow });
+                    return result;
+                }
+
+                public override void WriteMessage(Message message, Stream stream)
+                {
+                    this.inner.WriteMessage(message, stream);
+                }
+
+                public override ArraySegment<byte> WriteMessage(Message message, int maxMessageSize, BufferManager bufferManager, int messageOffset)
+                {
+                    return this.inner.WriteMessage(message, maxMessageSize, bufferManager, messageOffset);
+                }
+            }
+        }
+        static Binding GetBinding(bool server)
+        {
+            var result = new CustomBinding(new BasicHttpBinding());
+            if (server)
+            {
+                for (var i = 0; i < result.Elements.Count; i++)
+                {
+                    var mebe = result.Elements[i] as MessageEncodingBindingElement;
+                    if (mebe != null)
+                    {
+                        result.Elements[i] = new MyEncoderBindingElement(mebe);
+                        break;
+                    }
+                }
+            }
+
+            return result;
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            ServiceEndpoint endpoint = host.AddServiceEndpoint(typeof(ITest), GetBinding(true), "");
+            endpoint.EndpointBehaviors.Add(new MyInspector());
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            ChannelFactory<ITest> factory = new ChannelFactory<ITest>(GetBinding(false), new EndpointAddress(baseAddress));
+            ITest proxy = factory.CreateChannel();
+            proxy.DoSomething();
+
+            ((IClientChannel)proxy).Close();
+            factory.Close();
+
+            Console.Write("Press ENTER to close the host");
+            Console.ReadLine();
+            host.Close();
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            WsdlTemplate.Test();
+            AsyncTemplate.Test();
         }
     }
 }

@@ -14,11 +14,14 @@
 bin/
 obj/
 Debug/
+.vs/
 
 # C++ helper files #
 #######################
 *.sdf
 *.opensdf
+*.VC.db
+ipch/
 
 # Nuget #
 #########

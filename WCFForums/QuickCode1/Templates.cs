@@ -52,6 +52,88 @@ namespace QuickCode1
             host.Close();
         }
     }
+    public class AsyncTemplate
+    {
+        static void Trace(string text, params object[] args)
+        {
+            if (args != null && args.Length > 0) text = string.Format(text, args);
+            Console.WriteLine("[{0}] {1}", DateTime.UtcNow.ToString("HH:mm:ss.fff"), text);
+        }
+
+        [ServiceContract]
+        public interface ITest
+        {
+            [OperationContract(AsyncPattern = true)]
+            IAsyncResult BeginAdd(int x, int y, AsyncCallback callback, object state);
+            int EndAdd(IAsyncResult ar);
+        }
+        [ServiceBehavior(ConcurrencyMode = ConcurrencyMode.Single, InstanceContextMode = InstanceContextMode.PerCall)]
+        public class Service : ITest
+        {
+            delegate int IntDelegate(int x, int y);
+            int AddDoWork(int x, int y)
+            {
+                Trace("Service.AddDoWork, before sleep");
+                Thread.Sleep(2000);
+                Trace("Service.AddDoWork, after sleep");
+                return x + y;
+            }
+            public IAsyncResult BeginAdd(int x, int y, AsyncCallback callback, object state)
+            {
+                Trace("Service.BeginAdd");
+                IntDelegate theDelegate = new IntDelegate(this.AddDoWork);
+                return theDelegate.BeginInvoke(x, y, callback, state);
+            }
+
+            public int EndAdd(IAsyncResult ar)
+            {
+                Trace("Service.EndAdd");
+                IntDelegate theDelegate = (IntDelegate)((System.Runtime.Remoting.Messaging.AsyncResult)ar).AsyncDelegate;
+                return theDelegate.EndInvoke(ar);
+            }
+        }
+        static Binding GetBinding()
+        {
+            var result = new BasicHttpBinding();
+            return result;
+        }
+        public static void Test()
+        {
+            string baseAddress = "http://" + Environment.MachineName + ":8000/Service";
+            ServiceHost host = new ServiceHost(typeof(Service), new Uri(baseAddress));
+            host.AddServiceEndpoint(typeof(ITest), GetBinding(), "");
+            host.Open();
+            Console.WriteLine("Host opened");
+
+            Thread[] threads = new Thread[5];
+            for (var i = 0; i < threads.Length; i++)
+            {
+                threads[i] = new Thread(new ThreadStart(delegate
+                {
+                    ChannelFactory<ITest> factory = new ChannelFactory<ITest>(GetBinding(), new EndpointAddress(baseAddress));
+                    Trace("{0} - Client before call", Thread.CurrentThread.ManagedThreadId);
+                    ITest proxy = factory.CreateChannel();
+                    proxy.BeginAdd(5, 8, (result) =>
+                    {
+                        Trace("{0} - Client result: {1}", Thread.CurrentThread.ManagedThreadId, proxy.EndAdd(result));
+                        ((IClientChannel)proxy).Close();
+                        factory.Close();
+                    }, null);
+                }));
+            }
+
+            Trace("Starting threads...");
+            for (var i = 0; i < threads.Length; i++)
+            {
+                threads[i].Start();
+            }
+
+            Console.Write("Press ENTER to close the host");
+
+            Console.ReadLine();
+            host.Close();
+        }
+    }
     public class RestTemplate
     {
         [ServiceContract]
